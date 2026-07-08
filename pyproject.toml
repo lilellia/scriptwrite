@@ -1,0 +1,33 @@
+[project]
+name = "scriptwrite"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "niji>=0.2.0",
+    "pyqt6>=6.11.0",
+    "ruamel-yaml>=0.19.1",
+    "typing-extensions>=4.0; python_version < '3.12'",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["I001"]
+
+[tool.ruff.lint.isort]
+known-local-folder = ["scriptwrite"]
+force-single-line = false
+force-sort-within-sections = true
+order-by-type = false
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+]
