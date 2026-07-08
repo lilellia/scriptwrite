@@ -14,8 +14,8 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import (
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import (
     QAction,
     QCloseEvent,
     QKeySequence,
@@ -24,7 +24,7 @@ from PyQt6.QtGui import (
     QTextFormat,
     QTextFragment,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QMainWindow,
@@ -404,12 +404,12 @@ class LiveEditor(QMainWindow):
         super().setStatusBar(bar)
         return bar
 
-    def _scroll_sync(self) -> None:
+    def _scroll_sync(self, *, force: bool = False) -> None:
         line, col = self._editor.cursor_position
 
         self._status_bar["cursor"].content = f"L{line}:C{col}"
 
-        if line == self._cached_editor_line_number:
+        if line == self._cached_editor_line_number and not force:
             return
 
         self._preview.scroll_to_line(line)
@@ -458,7 +458,7 @@ class LiveEditor(QMainWindow):
         buttons = (
             QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel
         )
-        match QMessageBox.warning(self, "Unsaved Changes", text=message, buttons=buttons):
+        match QMessageBox.warning(self, "Unsaved Changes", message, buttons=buttons):
             case QMessageBox.StandardButton.Save:
                 self._save_file()
                 return not self.dirty  # True if save succeeded, False otherwise
@@ -523,6 +523,7 @@ class LiveEditor(QMainWindow):
         script = parser.parse_text(self._editor.content)
         content = renderers.html.render_html(script, inject_css=False)
         self._preview.html = content
+        self._scroll_sync(force=True)
 
         self._status_bar["word-counts"].content = f"[Word Counts] {script.word_count_display}"
 

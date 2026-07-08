@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from PyQt6.QtWidgets import QFileDialog, QWidget
+from PySide6.QtWidgets import QFileDialog, QWidget
 
 
 def get_open_filepath(
@@ -24,7 +24,7 @@ def get_open_filepath(
         filters = ["All Files (*)"]
 
     filename, _ = QFileDialog.getOpenFileName(
-        QWidget(), caption=caption, directory=str(directory), filter=";;".join(filters)
+        QWidget(), caption=caption, dir=str(directory), filter=";;".join(filters)
     )
 
     return Path(filename) if filename else None
@@ -48,7 +48,7 @@ def get_save_filepath(
         filters = ["All Files (*)"]
 
     filename, _ = QFileDialog.getSaveFileName(
-        QWidget(), caption=caption, directory=str(directory), filter=";;".join(filters)
+        QWidget(), caption=caption, dir=str(directory), filter=";;".join(filters)
     )
 
     return Path(filename) if filename else None
