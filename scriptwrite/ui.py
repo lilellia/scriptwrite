@@ -20,6 +20,8 @@ from PySide6.QtGui import (
     QCloseEvent,
     QKeySequence,
     QTextBlock,
+    QTextBlockUserData,
+    QTextCursor,
     QTextDocument,
     QTextFormat,
     QTextFragment,
@@ -188,6 +190,30 @@ class TextEdit(QTextEdit):
         cur = super().textCursor()
         return CursorPosition(line=cur.blockNumber() + 1, column=cur.columnNumber() + 1)
 
+    @cursor_position.setter
+    def cursor_position(self, pos: Iterable[int], /) -> None:
+        line, column = pos
+        block = self.doc.findBlockByLineNumber(line - 1)
+
+        if not block.isValid():
+            return
+
+        # clamp column to line length
+        col = max(0, min(column - 1, len(block.text())))
+
+        cur = super().textCursor()
+        cur.setPosition(block.position() + col)
+        super().setTextCursor(cur)
+        super().ensureCursorVisible()
+
+    def scroll_to_block(self, block: QTextBlock, *, align_top: bool = False) -> None:
+        super().setTextCursor(QTextCursor(block))
+        super().ensureCursorVisible()
+
+        if align_top:
+            y = self.doc.documentLayout().blockBoundingRect(block).top()
+            super().verticalScrollBar().setValue(int(y))
+
     @property
     def font_size(self) -> int | None:
         """Return the editor's font size, in pt. If the system is using pixel sizing, return None."""
@@ -203,54 +229,6 @@ class TextEdit(QTextEdit):
             yield
         finally:
             super().blockSignals(False)
-
-
-class EditorPane(TextEdit):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        super().setAcceptRichText(False)
-
-
-class PreviewPane(TextEdit):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        super().setReadOnly(True)
-        self.css = renderers.html.DEFAULT_CSS
-
-    def scroll_to_line(self, line: int) -> None:
-        def _blocks_of(document: QTextDocument) -> Iterator[QTextBlock]:
-            curr = document.begin()
-            while curr.isValid():
-                yield curr
-                curr = curr.next()
-
-        def _fragments_of(block: QTextBlock) -> Iterator[QTextFragment]:
-            it = block.begin()
-            while not it.atEnd():
-                yield it.fragment()
-                it += 1
-
-        def _valid_anchors() -> Iterator[str]:
-            for block in _blocks_of(self.doc):
-                for fragment in _fragments_of(block):
-                    if (fmt := fragment.charFormat()).isAnchor():
-                        if name := fmt.property(QTextFormat.Property.AnchorName):
-                            yield from name
-
-        def line_extractor(name: str) -> int:
-            if match := re.match(r"data-source-line_eq_(\d+)", name):
-                return int(match.group(1))
-
-            return 0
-
-        anchors = (name for name in _valid_anchors() if "data-source-line" in name)
-        anchors = (name for name in anchors if line_extractor(name) <= line)
-        try:
-            anchor = max(anchors, key=line_extractor)
-        except ValueError:
-            pass
-        else:
-            super().scrollToAnchor(anchor)
 
     @property
     def css(self) -> str:
@@ -287,6 +265,84 @@ class PreviewPane(TextEdit):
         s = re.sub(rf"font-size:\s*({_FLOAT_REGEX})\s*em\s*;", _font_size_em_to_px, s)
 
         cast(QTextDocument, super().document()).setDefaultStyleSheet(s)
+
+    def blocks(self) -> Iterator[QTextBlock]:
+        """Return an iterator over the QTextBlock objects that define the document."""
+        curr = self.doc.begin()
+        while curr.isValid():
+            yield curr
+            curr = curr.next()
+
+    @staticmethod
+    def fragments_of(block: QTextBlock) -> Iterator[QTextFragment]:
+        it = block.begin()
+        while not it.atEnd():
+            yield it.fragment()
+            it += 1
+
+    def fragments(self) -> Iterator[QTextFragment]:
+        """Return an iterator over the QTextFragment objects that define the document."""
+        for block in self.blocks():
+            yield from type(self).fragments_of(block)
+
+    def anchor_names(self) -> Iterator[str]:
+        """Return an iterator over all names that define anchors within the document.
+        An "anchor" is anything which can be scrolled to via scrollToAnchor.
+        """
+        for fragment in self.fragments():
+            if (fmt := fragment.charFormat()).isAnchor():
+                if names := fmt.property(QTextFormat.Property.AnchorName):
+                    yield from names
+
+
+class EditorPane(TextEdit):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        super().setAcceptRichText(False)
+
+
+class SourceLineData(QTextBlockUserData):
+    def __init__(self, source_line: int) -> None:
+        super().__init__()
+        self.source_line = source_line
+
+
+class PreviewPane(TextEdit):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        super().setReadOnly(True)
+        self.css = renderers.html.DEFAULT_CSS
+        self._source_line_map: dict[int, QTextBlock] = {}
+
+    @property
+    def html(self) -> str:
+        return super().html
+
+    @html.setter
+    def html(self, s: str, /) -> None:
+        # forcibly call super().html.fset
+        prop = getattr(super(__class__, type(self)), "html")
+        prop.__set__(self, s)
+
+        # and now inject source line numbers
+        for block in self.blocks():
+            for fragment in type(self).fragments_of(block):
+                if (fmt := fragment.charFormat()).isAnchor():
+                    for name in names if (names := fmt.property(QTextFormat.Property.AnchorName)) else []:
+                        if match := re.match(r"data-source-line_eq_(\d+)", name):
+                            source_line = int(match.group(1), 10)
+                            self._source_line_map[source_line] = block
+                            block.setUserData(SourceLineData(source_line))
+
+    def scroll_to_source_line(self, line: int) -> None:
+        target = self._source_line_map.get(line, None)
+
+        if target is None and (valid := [x for x in self._source_line_map.keys() if x <= line]):
+            # scan backwards to find the closet line before this one
+            target = self._source_line_map[max(valid)]
+
+        if target:
+            self.scroll_to_block(target, align_top=True)
 
 
 class Label(QLabel):
@@ -331,6 +387,7 @@ class LiveEditor(QMainWindow):
 
         self._cached_editor_line_number = 0
         self._editor.cursorPositionChanged.connect(self._scroll_sync)
+        self._preview.cursorPositionChanged.connect(self._reverse_scroll_sync)
 
         self._menubar = self._init_menu()
         self._status_bar = self._init_status_bar()
@@ -412,7 +469,21 @@ class LiveEditor(QMainWindow):
         if line == self._cached_editor_line_number and not force:
             return
 
-        self._preview.scroll_to_line(line)
+        with self._preview.suppress_signals():
+            self._preview.scroll_to_source_line(line)
+
+    def _reverse_scroll_sync(self, *, force: bool = False) -> None:
+        line, _ = self._preview.cursor_position
+        block = self._preview.doc.findBlockByLineNumber(line - 1)
+
+        if (data := block.userData()) and isinstance(data, SourceLineData):
+            # move the cursor to the start of the corresponding line
+            target = self._editor.doc.findBlockByLineNumber(data.source_line - 1)
+            with self._editor.suppress_signals():
+                self._editor.scroll_to_block(target, align_top=True)
+        else:
+            # the block probably should have had data but didn't, so... :shrug:
+            self._status_bar.ephemeral("Scroll sync failure: no source line data found", 1000)
 
     def _new_file(self) -> None:
         """Create a new file in the editor. If the current document has changed, prompt save."""
@@ -528,5 +599,5 @@ class LiveEditor(QMainWindow):
         self._status_bar["word-counts"].content = f"[Word Counts] {script.word_count_display}"
 
     def run(self) -> None:
-        super().show()
+        super().showMaximized()
         sys.exit(_app.exec())

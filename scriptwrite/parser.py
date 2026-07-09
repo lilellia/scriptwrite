@@ -122,7 +122,7 @@ def split_off_header(text: str) -> Document:
             buffer.write(line + "\n")
 
     # there's no trailing --- to close the header, so everything is header
-    return Document(header=buffer.getvalue(), body="", offset=i)
+    return Document(header=buffer.getvalue(), body="", offset=len(lines))
 
 
 def parse_header(text: str) -> dict[str, Any]:

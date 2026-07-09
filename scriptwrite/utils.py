@@ -1,9 +1,10 @@
 from collections.abc import Mapping
 from dataclasses import fields
-from typing import TypeVar, Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
+
     C = TypeVar("C", bound=DataclassInstance)
 
 
