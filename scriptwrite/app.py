@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 import os
 from pathlib import Path
 import sys
@@ -10,7 +10,6 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
@@ -22,7 +21,16 @@ from PySide6.QtWidgets import (
 )
 
 from scriptwrite import fs, parser, renderers
-from scriptwrite.widgets import _MenuBarProxy, _MenuItemData, EditorPane, PreviewPane, SourceLineData, StatusBar
+from scriptwrite.widgets import (
+    debouncable_timer,
+    EditorPane,
+    FindToolBar,
+    MenuBar,
+    MenuItemData,
+    PreviewPane,
+    SourceLineData,
+    StatusBar,
+)
 
 Q = TypeVar("Q", bound=QWidget)
 
@@ -58,11 +66,13 @@ class LiveEditor(QMainWindow):
 
         self._editor = self.add_pane(EditorPane())
         self._preview = self.add_pane(PreviewPane())
-        self._editor.textChanged.connect(self._on_change)
+        self._editor.on_change = self._on_change
 
         self._cached_editor_line_number = 0
-        self._editor.cursorPositionChanged.connect(self._scroll_sync)
-        self._preview.cursorPositionChanged.connect(self._reverse_scroll_sync)
+        self._editor.on_cursor_move = self._scroll_sync
+        self._preview.on_cursor_move = self._reverse_scroll_sync
+
+        self._find_toolbar = FindToolBar(self, self._find, self._replace).bind()
 
         self._menubar = self._init_menu()
         self._status_bar = self._init_status_bar()
@@ -73,7 +83,7 @@ class LiveEditor(QMainWindow):
 
         self._dirty: bool = False
 
-        self._render_timer = self._init_timer(duration=200, callback=self._compile)
+        self._render_timer = debouncable_timer(msecs=200, callback=self._compile)
 
     @property
     def title(self) -> str:
@@ -98,40 +108,32 @@ class LiveEditor(QMainWindow):
         self._split.addWidget(widget)
         return widget
 
-    def _init_menu(self) -> _MenuBarProxy:
-        menus: dict[str, Iterable[_MenuItemData]] = {
+    def _init_menu(self) -> MenuBar:
+        menus: dict[str, Iterable[MenuItemData]] = {
             "&File": [
-                _MenuItemData("&New", self._new_file, shortcut="Ctrl+n"),
-                _MenuItemData("&Open", self._get_open_file, shortcut="Ctrl+o"),
-                _MenuItemData("&Save", self._save_file, shortcut="Ctrl+s"),
-                _MenuItemData("---", None),
-                _MenuItemData("&Quit", self._quit, shortcut="Ctrl+q"),
+                MenuItemData("&New", self._new_file, shortcut="Ctrl+n"),
+                MenuItemData("&Open", self._get_open_file, shortcut="Ctrl+o"),
+                MenuItemData("&Save", self._save_file, shortcut="Ctrl+s"),
+                MenuItemData("---", None),
+                MenuItemData("&Quit", self._quit, shortcut="Ctrl+q"),
             ],
             "&Edit": [
-                _MenuItemData("&Undo", self._editor.undo, shortcut="Ctrl+z"),
-                _MenuItemData("&Redo", self._editor.redo, shortcut="Ctrl+Shift+z"),
-                _MenuItemData("---", None),
-                _MenuItemData("&Cut", self._editor.cut, shortcut="Ctrl+x"),
-                _MenuItemData("&Copy", self._editor.copy, shortcut="Ctrl+c"),
-                _MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+v"),
-                _MenuItemData("---", None),
-                _MenuItemData("&Find", self._find, shortcut="Ctrl+f"),
-                _MenuItemData("&Replace", self._replace, shortcut="Ctrl+h"),
+                MenuItemData("&Undo", self._editor.undo, shortcut="Ctrl+z"),
+                MenuItemData("&Redo", self._editor.redo, shortcut="Ctrl+Shift+z"),
+                MenuItemData("---", None),
+                MenuItemData("&Cut", self._editor.cut, shortcut="Ctrl+x"),
+                MenuItemData("&Copy", self._editor.copy, shortcut="Ctrl+c"),
+                MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+v"),
+                MenuItemData("---", None),
+                MenuItemData("&Find", self._find_toolbar.toggle, shortcut="Ctrl+f"),
             ],
             "&Help": [
-                _MenuItemData("&Help", self._show_help, shortcut="Ctrl+Shift+/"),
-                _MenuItemData("&About", self._show_about),
+                MenuItemData("&Help", self._show_help, shortcut="Ctrl+Shift+/"),
+                MenuItemData("&About", self._show_about),
             ],
         }
 
-        return _MenuBarProxy(cast(QMenuBar, super().menuBar()), menus=menus)
-
-    def _init_timer(self, duration: int, callback: Callable[[], None]) -> QTimer:
-        timer = QTimer()
-        timer.setSingleShot(True)
-        timer.setInterval(duration)
-        timer.timeout.connect(callback)
-        return timer
+        return MenuBar(cast(QMenuBar, super().menuBar()), menus=menus)
 
     def _init_status_bar(self) -> StatusBar:
         bar = StatusBar(self)
@@ -141,7 +143,7 @@ class LiveEditor(QMainWindow):
         return bar
 
     def _scroll_sync(self, *, force: bool = False) -> None:
-        line, col = self._editor.cursor_position
+        line, col = self._editor._cursor.position
 
         self._status_bar["cursor"].content = f"L{line}:C{col}"
 
@@ -152,7 +154,7 @@ class LiveEditor(QMainWindow):
             self._preview.scroll_to_source_line(line)
 
     def _reverse_scroll_sync(self, *, force: bool = False) -> None:
-        line, _ = self._preview.cursor_position
+        line, _ = self._preview._cursor.position
         block = self._preview.doc.findBlockByLineNumber(line - 1)
 
         if (data := block.userData()) and isinstance(data, SourceLineData):
@@ -182,8 +184,6 @@ class LiveEditor(QMainWindow):
 
         self.dirty = False
         self._compile()
-        with open("/tmp/x.html", "w") as f:
-            f.write(self._preview.html)
 
         self._status_bar.ephemeral(f"Loaded: {path}")
 
@@ -255,11 +255,11 @@ class LiveEditor(QMainWindow):
             if event:
                 event.ignore()
 
-    def _find(self) -> None:
+    def _find(self, forward: bool) -> None:
         # TODO
         pass
 
-    def _replace(self) -> None:
+    def _replace(self, replace_all: bool) -> None:
         # TODO
         pass
 

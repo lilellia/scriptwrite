@@ -1,3 +1,3 @@
-from scriptwrite.ui import LiveEditor
+from scriptwrite.app import LiveEditor
 
 __all__ = ["LiveEditor"]

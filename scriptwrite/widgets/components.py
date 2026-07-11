@@ -1,52 +1,136 @@
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
-from typing import Any, cast
+from __future__ import annotations
 
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMenu, QMenuBar, QStatusBar, QWidget
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from html.parser import HTMLParser
+from io import StringIO
+import re
+import sys
+from typing import Any, cast, Generic, NamedTuple, Self, TypeAlias, TypeVar
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
+
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QAction, QKeySequence, QTextBlock, QTextCursor, QTextDocument, QTextFragment
+from PySide6.QtWidgets import QLabel, QLineEdit, QMenu, QMenuBar, QStatusBar, QTextEdit, QToolBar, QWidget
+from typing_extensions import overload
+
+from scriptwrite.widgets.signals import QtSignalProperty
+from scriptwrite.widgets.utils import anchors_of
+
+C = TypeVar("C")
+Q = TypeVar("Q", bound=QWidget)
+T = TypeVar("T")
+
+F: TypeAlias = Callable[[], None]
+
+
+class QtProperty(Generic[T]):
+    def __init__(self, getter: str, setter: str | None = None) -> None:
+        self._get_name = getter
+        self._set_name = f"set{getter[0].upper()}{getter[1:]}" if setter is None else setter
+
+    @overload
+    def __get__(self, instance: None, owner: type[Q], /) -> Self: ...
+
+    @overload
+    def __get__(self, instance: Q, owner: type[Q], /) -> T: ...
+
+    def __get__(self, instance: Q | None, owner: type[Q], /) -> Self | T:
+        if instance is None:
+            return self
+
+        get = getattr(instance, self._get_name)
+        return get()
+
+    def __set__(self, instance: QWidget | None, value: T, /) -> None:
+        if instance is None:
+            return
+
+        set = getattr(instance, self._set_name)
+        set(value)
+
+
+class Action(QAction):
+    callback: QtSignalProperty = QtSignalProperty(signal_name="triggered")
+
+    def __init__(
+        self,
+        text: str,
+        parent: QWidget | None = None,
+        *,
+        callback: F | None = None,
+        tooltip: str | None = None,
+        shortcut: str | None = None,
+    ) -> None:
+        kwargs = {}
+
+        if tooltip:
+            kwargs["toolTip"] = tooltip
+
+        if shortcut:
+            kwargs["shortcut"] = QKeySequence(shortcut)
+
+        super().__init__(text, parent, **kwargs)
+        self.callback = callback
+
+    @property
+    def keyseq(self) -> str:
+        return super().shortcut().toString()
+
+    @keyseq.setter
+    def keyseq(self, value: str, /) -> None:
+        super().setShortcut(QKeySequence(value))
+
+    def bind(
+        self,
+        target: QWidget | None = None,
+    ) -> Self:
+        if target is None:
+            if (p := super().parent()) is None:
+                raise ValueError("Action is not bindable without specified target.")
+
+            target = cast(QWidget, p)
+
+        target.addAction(self)
+        return self
 
 
 @dataclass(frozen=True, slots=True)
-class _MenuItemData:
+class MenuItemData:
     name: str
-    callback: Callable[[], None] | None
+    callback: F | None
     shortcut: str | None = field(default=None, kw_only=True)
 
 
-class _MenuBarProxy:
-    def __init__(self, menubar: QMenuBar, *, menus: dict[str, Iterable[_MenuItemData]] | None = None) -> None:
-        self._proxied = menubar
+class MenuBar(QMenuBar):
+    def __init__(self, *args: Any, menus: dict[str, Iterable[MenuItemData]] | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
         self._menus: dict[str, QMenu] = {}
 
         if menus:
             self._add_menus(menus)
 
-    def _add_menus(self, menus: dict[str, Iterable[_MenuItemData]]) -> None:
-        for name, items in menus.items():
-            self._add_menu(name, items)
-
-    def _add_menu(self, name: str, items: Iterable[_MenuItemData]) -> None:
-        menu = cast(QMenu, self._proxied.addMenu(name))
+    def _add_menu(self, name: str, items: Iterable[MenuItemData]):
+        menu = cast(QMenu, super().addMenu(name))
 
         for item in items:
             if item.name == "---":
                 menu.addSeparator()
                 continue
 
-            action = QAction(item.name, menu)
-
-            if item.callback is not None:
-                action.triggered.connect(item.callback)
-
-            if item.shortcut:
-                action.setShortcut(QKeySequence(item.shortcut))
-
+            action = Action(item.name, menu, callback=item.callback, shortcut=item.shortcut)
             menu.addAction(action)
 
         self._menus[name] = menu
 
-    def __getattr__(self, key: Any) -> Any:
-        return getattr(self._proxied, key)
+    def _add_menus(self, menus: dict[str, Iterable[MenuItemData]]) -> None:
+        for name, items in menus.items():
+            self._add_menu(name, items)
 
 
 class Label(QLabel):
@@ -75,3 +159,254 @@ class StatusBar(QStatusBar):
 
     def ephemeral(self, message: str, duration: int = 2500) -> None:
         super().showMessage(message, duration)
+
+
+def debouncable_timer(msecs: int, callback: Callable[[], None]) -> QTimer:
+    """Create a timer with the given delay that executes the given callback when time elapses."""
+    timer = QTimer(singleShot=True, interval=msecs)
+    timer.timeout.connect(callback)
+
+    return timer
+
+
+class Toolbar(QToolBar):
+    @property
+    def is_visible(self) -> bool:
+        return super().isVisible()
+
+    @is_visible.setter
+    def is_visible(self, value: bool, /) -> None:
+        if value:
+            super().show()
+        else:
+            super().hide()
+
+    def add_widget(self, widget: QWidget) -> None:
+        super().addWidget(widget)
+
+
+class Entry(QLineEdit):
+    width_: QtProperty[int] = QtProperty("width", "setFixedWidth")
+    on_change: QtSignalProperty = QtSignalProperty(signal_name="textChanged")
+
+
+class _HTMLInjector(HTMLParser):
+    def __init__(self, buffer: StringIO) -> None:
+        super().__init__()
+        self._buffer = buffer
+
+    @staticmethod
+    def _make_attr_str(attrs: list[tuple[str, str | None]]) -> str:
+        return "".join(f' {k}="{v}"' if v is not None else f" {k}" for k, v in attrs)
+
+    def _inject(self, attrs: list[tuple[str, str | None]]) -> None:
+        for k, v in attrs:
+            if k.startswith("data-") and v is not None:
+                # forcibly inject an anchor tag
+                self._buffer.write(f'<a name="{k}_eq_{v}"></a>')
+
+    @override
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._buffer.write(f"<{tag}{self._make_attr_str(attrs)}>")
+        self._inject(attrs)
+
+    @override
+    def handle_endtag(self, tag: str) -> None:
+        self._buffer.write(f"</{tag}>")
+
+    @override
+    def handle_data(self, data: str) -> None:
+        self._buffer.write(data)
+
+    @override
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._buffer.write(f"<{tag}{self._make_attr_str(attrs)} />")
+        self._inject(attrs)  # best we can do is just put the injected elements immediately after
+
+    @override
+    def handle_decl(self, decl: str) -> None:
+        self._buffer.write(f"<!{decl}>")
+
+    @override
+    def handle_pi(self, data: str) -> None:
+        self._buffer.write(f"<?{data}>")
+
+    @classmethod
+    def inject_into(cls, source: str) -> str:
+        buffer = StringIO()
+        instance = cls(buffer)
+        instance.feed(source)
+        return buffer.getvalue()
+
+
+class TextArea(QTextEdit):
+    on_change: QtSignalProperty = QtSignalProperty(signal_name="textChanged")
+    on_cursor_move: QtSignalProperty = QtSignalProperty(signal_name="cursorPositionChanged")
+
+    def __init__(self, *args: Any, on_change: F | None = None, on_cursor_move: F | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.on_change = on_change
+        self.on_cursor_move = on_cursor_move
+        self._cursor = Cursor(parent=self)
+
+    @property
+    def doc(self) -> QTextDocument:
+        return super().document()
+
+    @property
+    def content(self) -> str:
+        return super().toPlainText()
+
+    @content.setter
+    def content(self, s: str, /) -> None:
+        super().setPlainText(s)
+
+    @property
+    def html(self) -> str:
+        return super().toHtml()
+
+    def _set_html(self, s: str) -> None:
+        # bring QTextEdit kicking and screaming into the... slightly less distant past
+        s = _HTMLInjector.inject_into(s)
+        super().setHtml(s)
+
+    @html.setter
+    def html(self, s: str, /) -> None:
+        self._set_html(s)
+
+    def scroll_to_block(self, block: QTextBlock, *, align_top: bool = False) -> None:
+        self._cursor.scroll_to_block(block)
+
+        if align_top:
+            y = self.doc.documentLayout().blockBoundingRect(block).top()
+            super().verticalScrollBar().setValue(int(y))
+
+    @contextmanager
+    def suppress_signals(self) -> Iterator[None]:
+        try:
+            super().blockSignals(True)
+            yield
+        finally:
+            super().blockSignals(False)
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        super().textCursor().beginEditBlock()
+        try:
+            yield
+        finally:
+            super().textCursor().endEditBlock()
+
+    @property
+    def font_size(self) -> int | None:
+        """Return the editor's font size, in pt. If the system is using pixel sizing, return None."""
+        if (size := super().font().pointSize()) <= 0:
+            return None
+
+        return size
+
+    @property
+    def css(self) -> str:
+        return self.doc.defaultStyleSheet()
+
+    @css.setter
+    def css(self, s: str, /) -> None:
+        # QTextEdit doesn't support all of modern CSS
+        # so we'll modify what we need to in order to get a reasonable translation
+        _FLOAT_REGEX = "[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)"
+        base_font_size = self.font_size or 10  # use 10pt as a default fo rmeasurement
+
+        def _em_to_px(em: float) -> int:
+            # 1 em     S pt     4 px
+            #       x ------ x ------
+            #          1 em     3 pt
+            #
+            # where S is the font-size (pt). Thus, 1em = 4S/3 px.
+            return round(em * 4 * base_font_size / 3)
+
+        # QTextEdit does not support ch as a unit, so we'll convert it to pt
+        def _convert_ch(m: re.Match[str]) -> str:
+            em = 0.5 * float(m.group(1))  # 1ch = 0.5em
+            return f"{_em_to_px(em)}px"
+
+        s = re.sub(rf"({_FLOAT_REGEX})\s*ch", _convert_ch, s)
+
+        # QTextEdit also does not support em as a font size, so we'll fix that too
+
+        def _font_size_em_to_px(m: re.Match[str]) -> str:
+            em = float(m.group(1))
+            return f"font-size: {_em_to_px(em)}px;"
+
+        s = re.sub(rf"font-size:\s*({_FLOAT_REGEX})\s*em\s*;", _font_size_em_to_px, s)
+
+        cast(QTextDocument, super().document()).setDefaultStyleSheet(s)
+
+    def blocks(self) -> Iterator[QTextBlock]:
+        """Return an iterator over the QTextBlock objects that define the document."""
+        curr = self.doc.begin()
+        while curr.isValid():
+            yield curr
+            curr = curr.next()
+
+    @staticmethod
+    def fragments_of(block: QTextBlock) -> Iterator[QTextFragment]:
+        it = block.begin()
+        while not it.atEnd():
+            yield it.fragment()
+            it += 1
+
+    def fragments(self) -> Iterator[QTextFragment]:
+        """Return an iterator over the QTextFragment objects that define the document."""
+        for block in self.blocks():
+            yield from type(self).fragments_of(block)
+
+    def anchor_names(self) -> Iterator[str]:
+        """Return an iterator over all names that define anchors within the document.
+        An "anchor" is anything which can be scrolled to via scrollToAnchor.
+        """
+        for fragment in self.fragments():
+            yield from anchors_of(fragment)
+
+
+class CursorPosition(NamedTuple):
+    line: int
+    column: int
+
+
+class Cursor:
+    def __init__(self, parent: TextArea):
+        self._parent = parent
+
+    @property
+    def current(self) -> QTextCursor:
+        return cast(QTextCursor, self._parent.textCursor())
+
+    @property
+    def position(self) -> CursorPosition:
+        current = self.current
+
+        line = current.blockNumber() + 1
+        column = current.columnNumber() + 1
+        return CursorPosition(line, column)
+
+    @position.setter
+    def position(self, value: Iterable[int], /) -> None:
+        line, column = value
+        block = self._parent.doc.findBlockByLineNumber(line - 1)
+
+        if not block.isValid():
+            return
+
+        # clamp column to line length
+        col = max(0, min(column - 1, len(block.text())))
+
+        self.scroll_to_index(block.position() + col)
+
+    def scroll_to_index(self, index: int) -> None:
+        current = self.current
+        current.setPosition(index)
+        self._parent.setTextCursor(current)
+        self._parent.ensureCursorVisible()
+
+    def scroll_to_block(self, block: QTextBlock) -> None:
+        self.scroll_to_index(block.position())
