@@ -1,23 +1,70 @@
+from __future__ import annotations
+
 from collections.abc import Callable
+from contextlib import suppress
+from dataclasses import dataclass
 from typing import Any, Generic, overload, Protocol, runtime_checkable, Self, TypeAlias, TypeVar
-from weakref import WeakKeyDictionary
+from weakref import ref, WeakKeyDictionary, WeakMethod
 
 from PySide6.QtWidgets import QWidget
 
-F: TypeAlias = Callable[[], None]
+VoidFn = TypeVar("VoidFn", bound=Callable[..., None])
 Q = TypeVar("Q", bound=QWidget)
+
+F: TypeAlias = Callable[[], None]
+Slot: TypeAlias = Callable[..., None]
+WeakCallable: TypeAlias = WeakMethod[VoidFn] | ref[VoidFn]
 
 
 @runtime_checkable
 class QtSignal(Protocol):
-    def connect(self, slot: Callable[..., None]) -> Any: ...
-    def disconnect(self, slot: Callable[..., None]) -> Any: ...
+    def connect(self, slot: Slot) -> Any: ...
+    def disconnect(self, slot: Slot) -> Any: ...
+
+
+@dataclass(slots=True, frozen=True)
+class _WeakSlotPointer:
+    weak_function: WeakCallable[F]
+
+
+@dataclass(slots=True, frozen=True)
+class _WeakSlotInfo:
+    weak_instance: ref[QWidget]
+    method: str
+
+
+class WeakSlot:
+    def __init__(self, f: F) -> None:
+        self._context: _WeakSlotPointer | _WeakSlotInfo
+
+        if (instance := getattr(f, "__self__", None)) is not None:
+            if hasattr(f, "__func__"):
+                # Python bound method
+                self._context = _WeakSlotPointer(weak_function=WeakMethod(f))
+            else:
+                # C-extension / PySide method
+                self._context = _WeakSlotInfo(weak_instance=ref(instance), method=f.__name__)
+        else:
+            # normal Python function
+            self._context = _WeakSlotPointer(weak_function=ref(f))
+
+    def _get_function(self) -> F | None:
+        match self._context:
+            case _WeakSlotPointer(weak_function):
+                return weak_function()
+            case _WeakSlotInfo(weak_instance, method):
+                if obj := weak_instance():
+                    return getattr(obj, method, None)
+
+    def __call__(self, *_: Any, **__: Any) -> None:
+        if f := self._get_function():
+            f()
 
 
 class QtSignalProperty(Generic[Q]):
     def __init__(self, signal_name: str) -> None:
         self.signal_name = signal_name
-        self._listeners: WeakKeyDictionary[Q, F] = WeakKeyDictionary()
+        self._slots: WeakKeyDictionary[Q, WeakSlot] = WeakKeyDictionary()
 
     @overload
     def __get__(self, instance: Q, owner: type[Q], /) -> F | None: ...
@@ -29,12 +76,10 @@ class QtSignalProperty(Generic[Q]):
         if instance is None:
             return self
 
-        return self._listeners.get(instance)
+        if (slot := self._slots.get(instance)) is not None:
+            return slot()
 
-    def __set__(self, instance: Q | None, callback: F | None, /) -> None:
-        if instance is None:
-            return
-
+    def __set__(self, instance: Q, callback: F | None, /) -> None:
         try:
             signal = getattr(instance, self.signal_name)
         except AttributeError:
@@ -43,16 +88,12 @@ class QtSignalProperty(Generic[Q]):
             if not isinstance(signal, QtSignal):
                 raise ValueError(f"{instance!r}.{self.signal_name} is not a Qt signal object")
 
-        if (previous := self._listeners.pop(instance, None)) is not None:
-            try:
+        if (previous := self._slots.pop(instance, None)) is not None:
+            with suppress(TypeError, RuntimeError):
                 signal.disconnect(previous)
-            except (TypeError, RuntimeError):
-                pass
 
         if callback is not None:
+            slot = WeakSlot(callback)
 
-            def f(*args: Any, **kwargs: Any) -> None:
-                callback()
-
-            signal.connect(f)
-            self._listeners[instance] = f
+            signal.connect(slot)
+            self._slots[instance] = slot
