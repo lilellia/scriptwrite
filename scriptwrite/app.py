@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import sys
 import textwrap
-from typing import cast, TypeVar
+from typing import TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -14,7 +14,6 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QMenuBar,
     QMessageBox,
     QSplitter,
     QWidget,
@@ -133,7 +132,7 @@ class LiveEditor(QMainWindow):
             ],
         }
 
-        return MenuBar(cast(QMenuBar, super().menuBar()), menus=menus)
+        return MenuBar(self, menus=menus)
 
     def _init_status_bar(self) -> StatusBar:
         bar = StatusBar(self)

@@ -16,11 +16,16 @@ else:
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QKeySequence, QTextBlock, QTextCursor, QTextDocument, QTextFragment
-from PySide6.QtWidgets import QLabel, QLineEdit, QMenu, QMenuBar, QStatusBar, QTextEdit, QToolBar, QWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QMainWindow, QMenu, QMenuBar, QStatusBar, QTextEdit, QToolBar, QWidget
 from typing_extensions import overload
 
 from scriptwrite.widgets.signals import QtSignalProperty
-from scriptwrite.widgets.utils import anchors_of
+from scriptwrite.widgets.utils import (
+    anchors_of,
+    build_qindex_map,
+    convert_string_index_to_utf16,
+    convert_utf16_index_to_python,
+)
 
 C = TypeVar("C")
 Q = TypeVar("Q", bound=QWidget)
@@ -108,12 +113,16 @@ class MenuItemData:
 
 
 class MenuBar(QMenuBar):
-    def __init__(self, *args: Any, menus: dict[str, Iterable[MenuItemData]] | None = None, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self, parent: QMainWindow, *args: Any, menus: dict[str, Iterable[MenuItemData]] | None = None, **kwargs: Any
+    ) -> None:
+        super().__init__(parent, *args, **kwargs)
         self._menus: dict[str, QMenu] = {}
 
         if menus:
             self._add_menus(menus)
+
+        parent.setMenuBar(self)
 
     def _add_menu(self, name: str, items: Iterable[MenuItemData]):
         menu = cast(QMenu, super().addMenu(name))
@@ -402,11 +411,49 @@ class Cursor:
 
         self.scroll_to_index(block.position() + col)
 
+    @property
+    def qindex(self) -> int:
+        """The current index (characters from the start) of the cursor, in QChar (utf-16)."""
+        return self.current.position()
+
+    @qindex.setter
+    def qindex(self, value: int, /) -> None:
+        self.current.setPosition(value)
+
+    def get_index(self) -> int:
+        """The current index (characters from the start) of the cursor."""
+        return convert_utf16_index_to_python(self._parent.content, self.qindex)
+
+    def move_to(self, index: int, *, select_between: bool = False) -> None:
+        q = convert_string_index_to_utf16(self._parent.content, index)
+        self._move_to_qindex(q, select_between=select_between)
+
+    def _move_to_qindex(self, qindex: int, *, select_between: bool = False) -> None:
+        mode = QTextCursor.MoveMode.KeepAnchor if select_between else QTextCursor.MoveMode.MoveAnchor
+        self.current.setPosition(qindex, mode=mode)
+
     def scroll_to_index(self, index: int) -> None:
-        current = self.current
-        current.setPosition(index)
-        self._parent.setTextCursor(current)
-        self._parent.ensureCursorVisible()
+        self.move_to(index)
+        self.update()
 
     def scroll_to_block(self, block: QTextBlock) -> None:
-        self.scroll_to_index(block.position())
+        self._move_to_qindex(block.position())
+        self.update()
+
+    def select(self, start: int, end: int) -> None:
+        """Force selection of the range [start, end)."""
+        qindex_map = build_qindex_map(self._parent.content[:end])
+        self._move_to_qindex(qindex_map[start])
+        self._move_to_qindex(qindex_map[end], select_between=True)
+        self.update()
+
+    @property
+    def selected_text(self) -> str:
+        if self.current.hasSelection():
+            return self.current.selectedText()
+
+        return ""
+
+    def update(self) -> None:
+        self._parent.setTextCursor(self.current)
+        self._parent.ensureCursorVisible()
