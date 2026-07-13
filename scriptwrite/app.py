@@ -124,7 +124,7 @@ class LiveEditor(QMainWindow):
                 MenuItemData("&Copy", self._editor.copy, shortcut="Ctrl+c"),
                 MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+v"),
                 MenuItemData("---", None),
-                MenuItemData("&Find", self._find_toolbar.toggle, shortcut="Ctrl+f"),
+                MenuItemData("&Find and Replace", self._find_toolbar.toggle, shortcut="Ctrl+f"),
             ],
             "&Help": [
                 MenuItemData("&Help", self._show_help, shortcut="Ctrl+Shift+/"),
@@ -254,11 +254,11 @@ class LiveEditor(QMainWindow):
             if event:
                 event.ignore()
 
-    def _find(self, forward: bool) -> None:
+    def _find(self, forward: bool, use_regex: bool, case_sensitive: bool) -> None:
         # TODO
         pass
 
-    def _replace(self, replace_all: bool) -> None:
+    def _replace(self, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None:
         # TODO
         pass
 

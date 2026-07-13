@@ -5,18 +5,41 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from io import StringIO
+from os import PathLike
+from pathlib import Path
 import re
 import sys
-from typing import Any, cast, Generic, NamedTuple, Self, TypeAlias, TypeVar
+from typing import Any, cast, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction, QKeySequence, QTextBlock, QTextCursor, QTextDocument, QTextFragment
-from PySide6.QtWidgets import QLabel, QLineEdit, QMainWindow, QMenu, QMenuBar, QStatusBar, QTextEdit, QToolBar, QWidget
+from PySide6.QtCore import QEvent, QFileSystemWatcher, QObject, Qt, QTimer
+from PySide6.QtGui import (
+    QAction,
+    QKeySequence,
+    QShortcut,
+    QTextBlock,
+    QTextCursor,
+    QTextDocument,
+    QTextFragment,
+)
+from PySide6.QtWidgets import (
+    QFrame,
+    QLabel,
+    QLayout,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMenuBar,
+    QSizePolicy,
+    QStatusBar,
+    QTextEdit,
+    QToolButton,
+    QWidget,
+)
 from typing_extensions import overload
 
 from scriptwrite.widgets.signals import QtSignalProperty
@@ -62,6 +85,8 @@ class QtProperty(Generic[T]):
 
 class Action(QAction):
     callback: QtSignalProperty = QtSignalProperty(signal_name="triggered")
+    on_toggle: QtSignalProperty = QtSignalProperty(signal_name="toggled")
+    checked: QtProperty[bool] = QtProperty(getter="isChecked", setter="setChecked")
 
     def __init__(
         self,
@@ -71,6 +96,8 @@ class Action(QAction):
         callback: F | None = None,
         tooltip: str | None = None,
         shortcut: str | None = None,
+        checkable: bool = False,
+        width: int | None = None,
     ) -> None:
         kwargs = {}
 
@@ -80,15 +107,15 @@ class Action(QAction):
         if shortcut:
             kwargs["shortcut"] = QKeySequence(shortcut)
 
-        super().__init__(text, parent, **kwargs)
+        super().__init__(text, parent, checkable=checkable, **kwargs)
         self.callback = callback
 
     @property
-    def keyseq(self) -> str:
+    def keys(self) -> str:
         return super().shortcut().toString()
 
-    @keyseq.setter
-    def keyseq(self, value: str, /) -> None:
+    @keys.setter
+    def keys(self, value: str, /) -> None:
         super().setShortcut(QKeySequence(value))
 
     def bind(
@@ -103,6 +130,45 @@ class Action(QAction):
 
         target.addAction(self)
         return self
+
+
+class Shortcut(QShortcut):
+    callback: QtSignalProperty = QtSignalProperty("activated")
+
+    def __init__(
+        self,
+        key: str,
+        parent: QWidget,
+        *,
+        callback: F | None = None,
+        scope: Literal["application", "window", "widget", "contained"] = "window",
+    ) -> None:
+        super().__init__(QKeySequence(key), parent)
+        self.scope = scope
+        self.callback = callback
+
+    @property
+    def scope(self) -> Literal["application", "window", "widget", "contained"]:
+        match super().context():
+            case Qt.ShortcutContext.ApplicationShortcut:
+                return "application"
+            case Qt.ShortcutContext.WindowShortcut:
+                return "window"
+            case Qt.ShortcutContext.WidgetShortcut:
+                return "widget"
+            case Qt.ShortcutContext.WidgetWithChildrenShortcut:
+                return "contained"
+
+    @scope.setter
+    def scope(self, value: Literal["application", "window", "widget", "contained"], /) -> None:
+        context = {
+            "application": Qt.ShortcutContext.ApplicationShortcut,
+            "window": Qt.ShortcutContext.WindowShortcut,
+            "widget": Qt.ShortcutContext.WidgetShortcut,
+            "contained": Qt.ShortcutContext.WidgetWithChildrenShortcut,
+        }[value]
+
+        super().setContext(context)
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +244,30 @@ def debouncable_timer(msecs: int, callback: Callable[[], None]) -> QTimer:
     return timer
 
 
-class Toolbar(QToolBar):
+class ToolButton(QToolButton):
+    def __init__(self, action: Action, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        super().setDefaultAction(action)
+        super().setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        super().setAutoRaise(True)
+        super().setCheckable(action.isCheckable())
+
+
+class Toolbar(QFrame):
+    def __init__(self, parent: QMainWindow, *args: Any, **kwargs: Any) -> None:
+        super().__init__(parent, *args, **kwargs)
+
+        super().setWindowFlags(Qt.WindowType.Widget | Qt.WindowType.FramelessWindowHint)
+
+        super().setAutoFillBackground(True)
+
+        super().setFrameShape(QFrame.Shape.Box)
+        super().setFrameShadow(QFrame.Shadow.Raised)
+
+    @property
+    def master(self) -> QMainWindow | None:
+        return cast(QMainWindow | None, super().parentWidget())
+
     @property
     def is_visible(self) -> bool:
         return super().isVisible()
@@ -187,11 +276,91 @@ class Toolbar(QToolBar):
     def is_visible(self, value: bool, /) -> None:
         if value:
             super().show()
+            self.reposition()
+            super().raise_()  # force render with higher z-index
         else:
             super().hide()
 
-    def add_widget(self, widget: QWidget) -> None:
-        super().addWidget(widget)
+    def add_action(
+        self,
+        text: str,
+        *,
+        checkable: bool = False,
+        callback: F | None = None,
+        tooltip: str | None = None,
+    ) -> ToolButton:
+        action = Action(text, self, callback=callback, tooltip=tooltip, checkable=checkable)
+        return ToolButton(action)
+
+    def force_minimal_size(self) -> None:
+        if layout := super().layout():
+            layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
+
+        super().setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+    def toggle(self) -> None:
+        self.is_visible = not self.is_visible
+
+    def reposition(self, margin: int = 5) -> None:
+        if self.master is None:
+            return
+
+        if (central := self.master.centralWidget()) is None:
+            return
+
+        super().adjustSize()
+
+        g = central.geometry()
+
+        if g.width() <= 0 or g.height() <= 0:
+            return
+
+        x = g.x() + margin
+        y = g.y() + g.height() - super().height() - margin
+        super().move(x, y)
+
+    @override
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.Move):
+            if self.is_visible:
+                self.reposition()
+
+        return super().eventFilter(watched, event)
+
+    def bind(self) -> Self:
+        if self.master:
+            self.master.installEventFilter(self)  # track parent resizing
+
+        super().hide()
+        return self
+
+
+class ToolbarActionGroup:
+    def __init__(self, *buttons: ToolButton) -> None:
+        self.buttons: list[ToolButton] = list(buttons)
+
+    def add(self, button: ToolButton) -> ToolButton:
+        self.buttons.append(button)
+        return button
+
+    def sync_widths(self) -> None:
+        """Finds the maximum width of the group's widgets and resizes all of them to that size."""
+        if not self.buttons:
+            return
+
+        max_width = max(b.sizeHint().width() for b in self.buttons)
+
+        for button in self.buttons:
+            button.setFixedWidth(max_width)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is not None:
+            return
+
+        self.sync_widths()
 
 
 class Entry(QLineEdit):
@@ -457,3 +626,59 @@ class Cursor:
     def update(self) -> None:
         self._parent.setTextCursor(self.current)
         self._parent.ensureCursorVisible()
+
+
+class FileWatcher(QFileSystemWatcher):
+    _on_directory_change: QtSignalProperty = QtSignalProperty("directoryChanged")
+
+    def __init__(
+        self,
+        path: str | PathLike[str],
+        parent: QObject | None = None,
+        *args: Any,
+        on_change: F | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(parent, *args, **kwargs)
+        self._path = Path(path)
+
+        try:
+            self._mtime = self._path.stat().st_mtime
+        except FileNotFoundError as e:
+            raise ValueError(f"Cannot watch nonexistent file {path}") from e
+
+        self.on_change = on_change
+        self._on_directory_change = self.__on_directory_change__
+        self.bind()
+
+    @property
+    def directory(self) -> Path:
+        return self._path.parent
+
+    def bind(self) -> None:
+        if str(self.directory) not in super().directories() and self._path.exists():
+            super().addPath(str(self.directory))
+
+    @contextmanager
+    def suppress_signals(self) -> Iterator[None]:
+        super().blockSignals(True)
+        try:
+            yield
+        finally:
+            super().blockSignals(False)
+
+    def __on_directory_change__(self) -> None:
+        self.bind()
+
+        try:
+            mtime = self._path.stat().st_mtime
+        except FileNotFoundError:
+            # file was deleted
+            # possibly an atomic write, in which case we should get another trigger on the write
+            pass
+        else:
+            if mtime > self._mtime:
+                self._mtime = mtime
+
+                if self.on_change:
+                    self.on_change()

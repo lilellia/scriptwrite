@@ -1,4 +1,13 @@
-from scriptwrite.widgets.components import debouncable_timer, Label, MenuBar, MenuItemData, StatusBar
+from scriptwrite.widgets.components import (
+    Cursor,
+    CursorPosition,
+    debouncable_timer,
+    FileWatcher,
+    Label,
+    MenuBar,
+    MenuItemData,
+    StatusBar,
+)
 from scriptwrite.widgets.panes import EditorPane, PreviewPane, SourceLineData
 from scriptwrite.widgets.toolbars import FindToolBar
 
@@ -12,4 +21,7 @@ __all__ = [
     "SourceLineData",
     "debouncable_timer",
     "FindToolBar",
+    "Cursor",
+    "CursorPosition",
+    "FileWatcher",
 ]
