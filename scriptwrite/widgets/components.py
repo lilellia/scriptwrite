@@ -95,28 +95,34 @@ class Action(QAction):
         *,
         callback: F | None = None,
         tooltip: str | None = None,
-        shortcut: str | None = None,
+        shortcut: str | Iterable[str] | None = None,
         checkable: bool = False,
-        width: int | None = None,
     ) -> None:
         kwargs = {}
 
         if tooltip:
             kwargs["toolTip"] = tooltip
 
-        if shortcut:
-            kwargs["shortcut"] = QKeySequence(shortcut)
-
+        self._name = text
         super().__init__(text, parent, checkable=checkable, **kwargs)
         self.callback = callback
 
+        if shortcut is not None:
+            if isinstance(shortcut, str):
+                self.keys = (shortcut,)
+            else:
+                self.keys = shortcut
+
     @property
-    def keys(self) -> str:
-        return super().shortcut().toString()
+    def keys(self) -> list[str]:
+        return [k.toString(QKeySequence.SequenceFormat.NativeText) for k in super().shortcuts()]
 
     @keys.setter
-    def keys(self, value: str, /) -> None:
-        super().setShortcut(QKeySequence(value))
+    def keys(self, value: Iterable[str], /) -> None:
+        super().setShortcuts([QKeySequence(k) for k in value])
+
+        s = ", ".join(self.keys)
+        super().setText(f"{self._name}\t{s}")
 
     def bind(
         self,
@@ -175,7 +181,7 @@ class Shortcut(QShortcut):
 class MenuItemData:
     name: str
     callback: F | None
-    shortcut: str | None = field(default=None, kw_only=True)
+    shortcut: str | Iterable[str] | None = field(default=None, kw_only=True)
 
 
 class MenuBar(QMenuBar):
@@ -183,6 +189,7 @@ class MenuBar(QMenuBar):
         self, parent: QMainWindow, *args: Any, menus: dict[str, Iterable[MenuItemData]] | None = None, **kwargs: Any
     ) -> None:
         super().__init__(parent, *args, **kwargs)
+        self._parent = parent
         self._menus: dict[str, QMenu] = {}
 
         if menus:
@@ -198,7 +205,7 @@ class MenuBar(QMenuBar):
                 menu.addSeparator()
                 continue
 
-            action = Action(item.name, menu, callback=item.callback, shortcut=item.shortcut)
+            action = Action(item.name, self._parent, callback=item.callback, shortcut=item.shortcut).bind(self._parent)
             menu.addAction(action)
 
         self._menus[name] = menu

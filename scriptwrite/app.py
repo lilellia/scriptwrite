@@ -108,26 +108,28 @@ class LiveEditor(QMainWindow):
         return widget
 
     def _init_menu(self) -> MenuBar:
+
         menus: dict[str, Iterable[MenuItemData]] = {
             "&File": [
-                MenuItemData("&New", self._new_file, shortcut="Ctrl+n"),
-                MenuItemData("&Open", self._get_open_file, shortcut="Ctrl+o"),
-                MenuItemData("&Save", self._save_file, shortcut="Ctrl+s"),
+                MenuItemData("&New", self._new_file, shortcut="Ctrl+N"),
+                MenuItemData("&Open", self._get_open_file, shortcut="Ctrl+O"),
+                MenuItemData("&Save", self._save_file, shortcut="Ctrl+S"),
+                MenuItemData("Save As", self._save_as, shortcut="Ctrl+Shift+S"),
                 MenuItemData("---", None),
-                MenuItemData("&Quit", self._quit, shortcut="Ctrl+q"),
+                MenuItemData("&Quit", self._quit, shortcut="Ctrl+Q"),
             ],
             "&Edit": [
-                MenuItemData("&Undo", self._editor.undo, shortcut="Ctrl+z"),
-                MenuItemData("&Redo", self._editor.redo, shortcut="Ctrl+Shift+z"),
+                MenuItemData("&Undo", self._editor.undo, shortcut="Ctrl+Z"),
+                MenuItemData("&Redo", self._editor.redo, shortcut=("Ctrl+Y", "Ctrl+Shift+Z")),
                 MenuItemData("---", None),
-                MenuItemData("&Cut", self._editor.cut, shortcut="Ctrl+x"),
-                MenuItemData("&Copy", self._editor.copy, shortcut="Ctrl+c"),
-                MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+v"),
+                MenuItemData("&Cut", self._editor.cut, shortcut="Ctrl+X"),
+                MenuItemData("&Copy", self._editor.copy, shortcut="Ctrl+C"),
+                MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+V"),
                 MenuItemData("---", None),
-                MenuItemData("&Find and Replace", self._find_toolbar.toggle, shortcut="Ctrl+f"),
+                MenuItemData("&Find/Replace", self._find_toolbar.toggle, shortcut=("Ctrl+F", "Ctrl+H")),
             ],
             "&Help": [
-                MenuItemData("&Help", self._show_help, shortcut="Ctrl+Shift+/"),
+                MenuItemData("&Help", self._show_help, shortcut="Ctrl+?"),
                 MenuItemData("&About", self._show_about),
             ],
         }
@@ -224,10 +226,10 @@ class LiveEditor(QMainWindow):
 
         return False
 
-    def _save_file(self) -> None:
+    def _save_file(self, *, save_as: bool = False, directory: Path = Path.home()) -> None:
         """Save the content of the editor pane to file."""
-        if self._filepath is None:
-            if (path := fs.get_save_filepath(filters=["Markdown Files (*.md)", "All Files (*)"])) is None:
+        if self._filepath is None or save_as:
+            if (path := fs.get_save_filepath(directory, filters=["Markdown Files (*.md)", "All Files (*)"])) is None:
                 return
 
             self._filepath = path
@@ -239,6 +241,12 @@ class LiveEditor(QMainWindow):
             self._status_bar.ephemeral(f"Save failed: {e}")
 
         self.dirty = False
+
+    def _save_as(self) -> None:
+        if self._filepath is None:
+            self._save_file(save_as=True)
+        else:
+            self._save_file(save_as=True, directory=self._filepath.parent)
 
     def _quit(self) -> None:
         """Exit the application."""
