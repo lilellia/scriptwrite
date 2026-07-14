@@ -9,7 +9,7 @@ T = TypeVar("T")
 Q = TypeVar("Q", bound=QObject)
 
 
-def default_set_name(get_name: str) -> str
+def default_set_name(get_name: str) -> str:
     return f"set{get_name[0].upper()}{get_name[1:]}"
 
 
@@ -50,12 +50,10 @@ class QtEnum(Generic[K]):
             raise ValueError(f"Invalid mapping: {k2e}")
 
     @overload
-    def __get__(self, instance: None, owner: type[Q], /) -> Self:
-        ...
+    def __get__(self, instance: None, owner: type[Q], /) -> Self: ...
 
     @overload
-    def __get__(self, instance: Q, owner: type[Q], /) -> Self:
-        ...
+    def __get__(self, instance: Q, owner: type[Q], /) -> Self: ...
 
     def __get__(self, instance: Q | None, owner: type[Q], /) -> Self | K:
         if instance is None:
