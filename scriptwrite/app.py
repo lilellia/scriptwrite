@@ -3,14 +3,14 @@ import os
 from pathlib import Path
 import sys
 import textwrap
-from typing import TypeVar
+from typing import cast, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QTextBlock
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -156,16 +156,21 @@ class LiveEditor(QMainWindow):
 
     def _reverse_scroll_sync(self, *, force: bool = False) -> None:
         line, _ = self._preview._cursor.position
-        block = self._preview.doc.findBlockByLineNumber(line - 1)
 
-        if (data := block.userData()) and isinstance(data, SourceLineData):
-            # move the cursor to the start of the corresponding line
-            target = self._editor.doc.findBlockByLineNumber(data.source_line - 1)
-            with self._editor.suppress_signals():
-                self._editor.scroll_to_block(target, align_top=True)
-        else:
-            # the block probably should have had data but didn't, so... :shrug:
-            self._status_bar.ephemeral("Scroll sync failure: no source line data found", 1000)
+        block = cast(QTextBlock, self._preview.get_block_at_line(line))
+
+        if (data := block.userData()) is None:
+            self._status_bar.ephemeral("Scroll sync failure: preview line does not contain reference")
+            return
+
+        if not isinstance(data, SourceLineData):
+            self._status_bar.ephemeral("Scroll sync failure: preview line does not contain source line data")
+            return
+
+        target = cast(QTextBlock, self._editor.get_block_at_line(data.source_line))
+
+        with self._editor.suppress_signals():
+            self._editor.scroll_to_block(target, align_top=True)
 
     def _new_file(self) -> None:
         """Create a new file in the editor. If the current document has changed, prompt save."""

@@ -9,7 +9,9 @@ from os import PathLike
 from pathlib import Path
 import re
 import sys
-from typing import Any, cast, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar
+from typing import Any, cast, Literal, NamedTuple, Self, TypeAlias, TypeVar
+
+from scriptwrite.widgets.descriptors import QtEnum, QtProperty
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -40,7 +42,6 @@ from PySide6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from typing_extensions import overload
 
 from scriptwrite.widgets.signals import QtSignalProperty
 from scriptwrite.widgets.utils import (
@@ -51,42 +52,17 @@ from scriptwrite.widgets.utils import (
 )
 
 C = TypeVar("C")
-Q = TypeVar("Q", bound=QWidget)
+Q = TypeVar("Q", bound=QObject)
 T = TypeVar("T")
 
 F: TypeAlias = Callable[[], None]
-
-
-class QtProperty(Generic[T]):
-    def __init__(self, getter: str, setter: str | None = None) -> None:
-        self._get_name = getter
-        self._set_name = f"set{getter[0].upper()}{getter[1:]}" if setter is None else setter
-
-    @overload
-    def __get__(self, instance: None, owner: type[Q], /) -> Self: ...
-
-    @overload
-    def __get__(self, instance: Q, owner: type[Q], /) -> T: ...
-
-    def __get__(self, instance: Q | None, owner: type[Q], /) -> Self | T:
-        if instance is None:
-            return self
-
-        get = getattr(instance, self._get_name)
-        return get()
-
-    def __set__(self, instance: QWidget | None, value: T, /) -> None:
-        if instance is None:
-            return
-
-        set = getattr(instance, self._set_name)
-        set(value)
 
 
 class Action(QAction):
     callback: QtSignalProperty = QtSignalProperty(signal_name="triggered")
     on_toggle: QtSignalProperty = QtSignalProperty(signal_name="toggled")
     checked: QtProperty[bool] = QtProperty(getter="isChecked", setter="setChecked")
+    checkable: QtProperty[bool] = QtProperty(getter="isCheckable", setter="setCheckable")
 
     def __init__(
         self,
@@ -140,6 +116,15 @@ class Action(QAction):
 
 class Shortcut(QShortcut):
     callback: QtSignalProperty = QtSignalProperty("activated")
+    scope: QtEnum[Literal["application", "window", "widget", "contained"]] = QtEnum(
+        "context",
+        {
+            "application": Qt.ShortcutContext.ApplicationShortcut,
+            "window": Qt.ShortcutContext.WindowShortcut,
+            "widget": Qt.ShortcutContext.WidgetShortcut,
+            "contained": Qt.ShortcutContext.WidgetWithChildrenShortcut,
+        },
+    )
 
     def __init__(
         self,
@@ -152,29 +137,6 @@ class Shortcut(QShortcut):
         super().__init__(QKeySequence(key), parent)
         self.scope = scope
         self.callback = callback
-
-    @property
-    def scope(self) -> Literal["application", "window", "widget", "contained"]:
-        match super().context():
-            case Qt.ShortcutContext.ApplicationShortcut:
-                return "application"
-            case Qt.ShortcutContext.WindowShortcut:
-                return "window"
-            case Qt.ShortcutContext.WidgetShortcut:
-                return "widget"
-            case Qt.ShortcutContext.WidgetWithChildrenShortcut:
-                return "contained"
-
-    @scope.setter
-    def scope(self, value: Literal["application", "window", "widget", "contained"], /) -> None:
-        context = {
-            "application": Qt.ShortcutContext.ApplicationShortcut,
-            "window": Qt.ShortcutContext.WindowShortcut,
-            "widget": Qt.ShortcutContext.WidgetShortcut,
-            "contained": Qt.ShortcutContext.WidgetWithChildrenShortcut,
-        }[value]
-
-        super().setContext(context)
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,24 +214,58 @@ def debouncable_timer(msecs: int, callback: Callable[[], None]) -> QTimer:
 
 
 class ToolButton(QToolButton):
+    action: QtProperty[Action] = QtProperty("defaultAction")
+    auto_raise: QtProperty[bool] = QtProperty("autoRaise")
+    checkable: QtProperty[bool] = QtProperty(getter="isCheckable", setter="setCheckable")
+    button_style: QtEnum[Literal["follow", "icon", "text-beside-icon", "text", "text-under-icon"]] = QtEnum(
+        "toolButtonStyle",
+        {
+            "follow": Qt.ToolButtonStyle.ToolButtonFollowStyle,
+            "icon": Qt.ToolButtonStyle.ToolButtonIconOnly,
+            "text-beside-icon": Qt.ToolButtonStyle.ToolButtonTextBesideIcon,
+            "text": Qt.ToolButtonStyle.ToolButtonTextOnly,
+            "text-under-icon": Qt.ToolButtonStyle.ToolButtonTextUnderIcon,
+        },
+    )
+
     def __init__(self, action: Action, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        super().setDefaultAction(action)
-        super().setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        super().setAutoRaise(True)
-        super().setCheckable(action.isCheckable())
+        self.action = action
+        self.auto_raise = True
+        self.checkable = action.checkable
+        self.button_style = "text"
 
 
-class Toolbar(QFrame):
+class Frame(QFrame):
+    autofill_bg: QtProperty[bool] = QtProperty("autoFillBackground")
+    frame_shape: QtEnum[Literal["none", "box", "panel", "styled-panel", "hline", "vline", "win-panel"]] = QtEnum(
+        "frameShape",
+        {
+            "none": QFrame.Shape.NoFrame,
+            "box": QFrame.Shape.Box,
+            "panel": QFrame.Shape.Panel,
+            "styled-panel": QFrame.Shape.StyledPanel,
+            "hline": QFrame.Shape.HLine,
+            "vline": QFrame.Shape.VLine,
+            "win-panel": QFrame.Shape.WinPanel,
+        },
+    )
+    frame_shadow: QtEnum[Literal["none", "raised", "sunken"]] = QtEnum(
+        "frameShadow", {"none": QFrame.Shadow.Plain, "sunken": QFrame.Shadow.Sunken, "raised": QFrame.Shadow.Raised}
+    )
+
+
+class Toolbar(Frame):
+    autofill_bg: QtProperty[bool] = QtProperty("autoFillBackground")
+
     def __init__(self, parent: QMainWindow, *args: Any, **kwargs: Any) -> None:
         super().__init__(parent, *args, **kwargs)
 
         super().setWindowFlags(Qt.WindowType.Widget | Qt.WindowType.FramelessWindowHint)
 
-        super().setAutoFillBackground(True)
-
-        super().setFrameShape(QFrame.Shape.Box)
-        super().setFrameShadow(QFrame.Shadow.Raised)
+        self.autofill_bg = True
+        self.frame_shape = "box"
+        self.frame_shadow = "raised"
 
     @property
     def master(self) -> QMainWindow | None:
@@ -427,6 +423,7 @@ class _HTMLInjector(HTMLParser):
 class TextArea(QTextEdit):
     on_change: QtSignalProperty = QtSignalProperty(signal_name="textChanged")
     on_cursor_move: QtSignalProperty = QtSignalProperty(signal_name="cursorPositionChanged")
+    content: QtProperty[str] = QtProperty(getter="toPlainText", setter="setPlainText")
 
     def __init__(self, *args: Any, on_change: F | None = None, on_cursor_move: F | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -437,14 +434,6 @@ class TextArea(QTextEdit):
     @property
     def doc(self) -> QTextDocument:
         return super().document()
-
-    @property
-    def content(self) -> str:
-        return super().toPlainText()
-
-    @content.setter
-    def content(self, s: str, /) -> None:
-        super().setPlainText(s)
 
     @property
     def html(self) -> str:
@@ -532,6 +521,12 @@ class TextArea(QTextEdit):
         while curr.isValid():
             yield curr
             curr = curr.next()
+
+    def get_block_at_line(self, line: int) -> QTextBlock | None:
+        if 1 <= line <= self.doc.blockCount():
+            return self.doc.findBlockByLineNumber(line - 1)
+
+        return None
 
     @staticmethod
     def fragments_of(block: QTextBlock) -> Iterator[QTextFragment]:
