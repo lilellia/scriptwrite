@@ -44,9 +44,7 @@ class FindToolBar(Toolbar):
 
         with Box(self, direction="vertical") as box:
             with Box(box, direction="horizontal") as row1:
-                self.search_input = row1.add(Entry(self, placeholderText="Find..."))
-                self.search_input.width_ = 200
-                self.search_input.on_change = _find_next
+                self.search_input = row1.add(Entry(self, placeholder="Find...", width=200, on_change=_find_next))
 
                 self._buttons["find-previous"] = row1.add(
                     self.add_action("«", tooltip="Find Previous", callback=_find_prev)

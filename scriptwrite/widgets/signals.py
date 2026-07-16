@@ -8,10 +8,9 @@ from weakref import ref, WeakKeyDictionary, WeakMethod
 
 from PySide6.QtWidgets import QWidget
 
-VoidFn = TypeVar("VoidFn", bound=Callable[..., None])
-Q = TypeVar("Q", bound=QWidget)
+from scriptwrite.types import F, Q
 
-F: TypeAlias = Callable[[], None]
+VoidFn = TypeVar("VoidFn", bound=Callable[..., None])
 Slot: TypeAlias = Callable[..., None]
 WeakCallable: TypeAlias = WeakMethod[VoidFn] | ref[VoidFn]
 

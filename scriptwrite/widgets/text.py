@@ -7,7 +7,7 @@ import sys
 from typing import Any, cast
 
 from PySide6.QtGui import QTextBlock, QTextDocument, QTextFormat, QTextFragment
-from PySide6.QtWidgets import QLabel, QLineEdit, QTextEdit
+from PySide6.QtWidgets import QLabel, QLineEdit, QTextEdit, QWidget
 
 from scriptwrite.widgets.cursor import Cursor
 
@@ -31,7 +31,27 @@ def anchors_of(fragment: QTextFragment) -> Iterator[str]:
 class Entry(QLineEdit):
     width_: QtProperty[int] = QtProperty("width", "setFixedWidth")
     content: QtProperty[str] = QtProperty("text")
+    placeholder: QtProperty[str] = QtProperty("placeholderText")
     on_change: QtSignalProperty = QtSignalProperty("textChanged")
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        text: str = "",
+        *args: Any,
+        placeholder: str = "",
+        width: int | None = None,
+        on_change: F | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.content = text
+        self.placeholder = placeholder
+
+        if width is not None:
+            self.width_ = width
+
+        self.on_change = on_change
 
 
 class Label(QLabel):
