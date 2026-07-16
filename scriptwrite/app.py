@@ -1,11 +1,9 @@
 from collections.abc import Iterable
 from pathlib import Path
+import re
 import sys
 import textwrap
-from typing import cast
-
-from scriptwrite.config import Config
-from scriptwrite.types import W
+from typing import Callable, cast
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -20,7 +18,10 @@ from PySide6.QtWidgets import (
 )
 
 from scriptwrite import fs, parser, renderers
+from scriptwrite.config import Config
 from scriptwrite.features import EditorPane, FindToolBar, PreviewPane
+from scriptwrite.log import logger
+from scriptwrite.types import W
 from scriptwrite.widgets import (
     Application,
     MenuBar,
@@ -138,7 +139,7 @@ class LiveEditor(QMainWindow):
             target = cast(QTextBlock, self._editor.get_block_at_line(source_line))
 
             with self._editor.suppress_signals():
-                self._editor.scroll_to_block(target, align_top=True)
+                self._editor.scroll_to_block(target, align=True)
 
     def _new_file(self) -> None:
         """Create a new file in the editor. If the current document has changed, prompt save."""
@@ -236,8 +237,67 @@ class LiveEditor(QMainWindow):
                 event.ignore()
 
     def _find(self, needle: str, forward: bool, use_regex: bool, case_sensitive: bool) -> None:
-        # TODO
-        pass
+        if not needle:
+            return
+
+        haystack = self._editor.content
+
+        flags = re.MULTILINE
+        if not case_sensitive:
+            flags |= re.IGNORECASE
+
+        cursor = self._editor._cursor
+        pos = cursor.get_index()
+
+        pattern = re.compile(needle if use_regex else re.escape(needle), flags)
+        matches = list(pattern.finditer(haystack))
+
+        if not matches:
+            self._find_toolbar.set_label(0, 0)
+            return
+
+        def _match(
+            match_list: list[re.Match[str]], filter: Callable[[int, int], bool], wrap_around_message: str
+        ) -> int:
+            i = 1
+            for i, match in enumerate(match_list, start=1):
+                span = match.span()
+
+                def _is_same_selection():
+                    if not (sel := self._editor._cursor.selected_range):
+                        return False
+
+                    return span[0] == sel[0] and match.group(0) == self._editor._cursor.selected_text
+
+                if _is_same_selection():
+                    # we're sitting on a match and being asked to forcibly match beyond it
+                    continue
+
+                if filter(*span):
+                    self._editor._cursor.select(*span)
+                    return i
+            else:
+                # there were no matches after the cursor
+                self._editor._cursor.select(*match_list[0].span())
+                self._status_bar.ephemeral(wrap_around_message)
+                return 1
+
+        if forward:
+            i = _match(
+                matches,
+                filter=lambda a, _: a >= pos,
+                wrap_around_message="Reached bottom of page, continuing from top",
+            )
+        else:
+            i = _match(
+                list(reversed(matches)),
+                filter=lambda _, b: b <= pos,
+                wrap_around_message="Reached top of page, continuing from bottom",
+            )
+
+            i = len(matches) - i + 1
+
+        self._find_toolbar.set_label(i, len(matches))
 
     def _replace(self, needle: str, replacement: str, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None:
         # TODO

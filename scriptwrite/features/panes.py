@@ -71,4 +71,4 @@ class PreviewPane(TextArea):
             target = self._source_line_map[max(valid)]
 
         if target:
-            self.scroll_to_block(target, align_top=True)
+            self.scroll_to_block(target, align=True)

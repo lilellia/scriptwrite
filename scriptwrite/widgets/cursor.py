@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     # TextArea holds a reference to Cursor, so we end up in an import cycle without the TYPE_CHECKING guard
     from scriptwrite.widgets.text import TextArea
 
+from scriptwrite.log import logger
+
 
 def convert_string_index_to_utf16(text: str, idx: int) -> int:
     """Convert a Python character index to a Qt UTF-16 position."""
@@ -29,10 +31,12 @@ def build_qindex_map(text: str) -> dict[int, int]:
     """Return a map of {index: qindex} for the given string."""
     mapping: dict[int, int] = {0: 0}
 
-    qindex = 0
+    index = qindex = 0
     for index, char in enumerate(text):
-        qindex += len(char.encode("utf-16-le")) // 2
         mapping[index] = qindex
+        qindex += len(char.encode("utf-16-le")) // 2
+
+    mapping[index] = qindex
 
     return mapping
 
@@ -46,16 +50,15 @@ class Cursor:
     def __init__(self, parent: TextArea):
         self._parent = parent
 
-    @property
-    def current(self) -> QTextCursor:
+    def _get(self) -> QTextCursor:
         return cast(QTextCursor, self._parent.textCursor())
 
     @property
     def position(self) -> CursorPosition:
-        current = self.current
+        _cur = self._get()
 
-        line = current.blockNumber() + 1
-        column = current.columnNumber() + 1
+        line = _cur.blockNumber() + 1
+        column = _cur.columnNumber() + 1
         return CursorPosition(line, column)
 
     @position.setter
@@ -69,20 +72,25 @@ class Cursor:
         # clamp column to line length
         col = max(0, min(column - 1, len(block.text())))
 
-        self.scroll_to_index(block.position() + col)
+        self._move_to_qindex(block.position() + col)
 
     @property
     def qindex(self) -> int:
         """The current index (characters from the start) of the cursor, in QChar (utf-16)."""
-        return self.current.position()
+        return self._get().position()
 
     @qindex.setter
     def qindex(self, value: int, /) -> None:
-        self.current.setPosition(value)
+        _cur = self._get()
+        _cur.setPosition(value)
+        self.update(_cur)
 
     def get_index(self) -> int:
         """The current index (characters from the start) of the cursor."""
         return convert_utf16_index_to_python(self._parent.content, self.qindex)
+
+    def current_block(self) -> QTextBlock:
+        return self._get().block()
 
     def move_to(self, index: int, *, select_between: bool = False) -> None:
         q = convert_string_index_to_utf16(self._parent.content, index)
@@ -90,30 +98,40 @@ class Cursor:
 
     def _move_to_qindex(self, qindex: int, *, select_between: bool = False) -> None:
         mode = QTextCursor.MoveMode.KeepAnchor if select_between else QTextCursor.MoveMode.MoveAnchor
-        self.current.setPosition(qindex, mode=mode)
 
-    def scroll_to_index(self, index: int) -> None:
-        self.move_to(index)
-        self.update()
+        _cur = self._get()
+        _cur.setPosition(qindex, mode=mode)
+        self.update(_cur)
 
-    def scroll_to_block(self, block: QTextBlock) -> None:
+    def move_to_block(self, block: QTextBlock) -> None:
         self._move_to_qindex(block.position())
-        self.update()
 
     def select(self, start: int, end: int) -> None:
         """Force selection of the range [start, end)."""
         qindex_map = build_qindex_map(self._parent.content[:end])
-        self._move_to_qindex(qindex_map[start])
-        self._move_to_qindex(qindex_map[end], select_between=True)
-        self.update()
+        self._move_to_qindex(qindex_map[end - 1])
+        self._move_to_qindex(qindex_map[start], select_between=True)
+        self._parent.align_screen_view_to_block(self.current_block())
+
+    @property
+    def selected_range(self) -> tuple[int, int] | None:
+        if _cur := self._get():
+            q1, q2 = _cur.selectionStart(), _cur.selectionEnd()
+
+            # because qindices are always larger than their index counterparts, [:q2] is guaranteed to be sufficient
+            qindex_map = build_qindex_map(self._parent.content[:q2])
+            i1 = next(i for i, q in qindex_map.items() if q >= q1)
+            i2 = next(i for i, q in qindex_map.items() if q >= q2) + 1  # to account for exclusive RHS
+
+            return i1, i2
 
     @property
     def selected_text(self) -> str:
-        if self.current.hasSelection():
-            return self.current.selectedText()
+        if (_cur := self._get()).hasSelection():
+            return _cur.selectedText()
 
         return ""
 
-    def update(self) -> None:
-        self._parent.setTextCursor(self.current)
+    def update(self, cur: QTextCursor) -> None:
+        self._parent.setTextCursor(cur)
         self._parent.ensureCursorVisible()

@@ -141,12 +141,18 @@ class TextArea(QTextEdit):
     def html(self, s: str, /) -> None:
         self._set_html(s)
 
-    def scroll_to_block(self, block: QTextBlock, *, align_top: bool = False) -> None:
-        self._cursor.scroll_to_block(block)
+    def align_screen_view_to_block(self, block: QTextBlock) -> None:
+        viewport_height = super().viewport().height()
+        block_rect = self.doc.documentLayout().blockBoundingRect(block)
 
-        if align_top:
-            y = self.doc.documentLayout().blockBoundingRect(block).top()
-            super().verticalScrollBar().setValue(int(y))
+        y = block_rect.top() - (viewport_height * 0.5) + (block_rect.height() * 0.5)
+        super().verticalScrollBar().setValue(int(y))
+
+    def scroll_to_block(self, block: QTextBlock, *, align: bool = False) -> None:
+        self._cursor.move_to_block(block)
+
+        if align:
+            self.align_screen_view_to_block(block)
 
     @contextmanager
     def suppress_signals(self) -> Iterator[None]:

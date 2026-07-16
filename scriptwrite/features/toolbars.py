@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QMainWindow
 
 from scriptwrite.widgets.actions import Shortcut
 from scriptwrite.widgets.layouts import Box
-from scriptwrite.widgets.text import Entry
+from scriptwrite.widgets.text import Entry, Label
 from scriptwrite.widgets.toolbars import Toolbar, ToolbarActionGroup, ToolButton
 
 ButtonLabel = Literal[
@@ -74,7 +74,7 @@ class FindToolBar(Toolbar):
                     self.add_action("R*", tooltip="Replace All", callback=_replace_all)
                 )
 
-                row2.add_stretch()
+                self._count_label = row2.add(Label("-", self))
 
         ToolbarActionGroup(*self._buttons.values()).sync_widths()
         self.force_minimal_size()
@@ -97,6 +97,9 @@ class FindToolBar(Toolbar):
     @property
     def case_sensitive(self) -> bool:
         return self._buttons["case-sensitive"].checked
+
+    def set_label(self, index: int, total: int) -> None:
+        self._count_label.content = f"{index}/{total}"
 
     def find_impl(self, f: FindFunction, forward: bool) -> None:
         f(needle=self.needle, forward=forward, use_regex=self.use_regex, case_sensitive=self.case_sensitive)
