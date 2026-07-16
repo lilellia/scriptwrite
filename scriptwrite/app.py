@@ -5,6 +5,8 @@ import sys
 import textwrap
 from typing import cast, TypeVar
 
+from scriptwrite.config import Config
+
 if sys.version_info >= (3, 12):
     from typing import override
 else:
@@ -12,7 +14,6 @@ else:
 
 from PySide6.QtGui import QCloseEvent, QTextBlock
 from PySide6.QtWidgets import (
-    QApplication,
     QMainWindow,
     QMessageBox,
     QSplitter,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from scriptwrite import fs, parser, renderers
 from scriptwrite.widgets import (
+    Application,
     debouncable_timer,
     EditorPane,
     FindToolBar,
@@ -38,6 +40,8 @@ def _extend_qt6_plugin_paths() -> None:
     if not sys.platform.startswith("linux"):
         return
 
+    os.environ.pop("QT_QPA_PLATFORMTHEME", None)
+
     # try to find the system-wide plugins
     system_paths = ["/usr/lib/qt6/plugins", "/usr/lib64/qt6/plugins", "/usr/lib/x86_64-linux-gnu/qt6/plugins"]
     system_paths = [p for p in system_paths if Path(p).exists()]
@@ -51,8 +55,9 @@ def _extend_qt6_plugin_paths() -> None:
 
 
 _extend_qt6_plugin_paths()
+config = Config.load()
 
-_app = QApplication(["scriptwrite"])
+_app = Application(["scriptwrite"], mode=config.mode)
 
 
 class LiveEditor(QMainWindow):

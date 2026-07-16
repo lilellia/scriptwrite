@@ -9,7 +9,7 @@ from os import PathLike
 from pathlib import Path
 import re
 import sys
-from typing import Any, cast, Literal, NamedTuple, Self, TypeAlias, TypeVar
+from typing import Any, assert_never, cast, Literal, NamedTuple, Self, TypeAlias, TypeVar
 
 from scriptwrite.widgets.descriptors import QtEnum, QtProperty
 
@@ -22,13 +22,16 @@ from PySide6.QtCore import QEvent, QFileSystemWatcher, QObject, Qt, QTimer
 from PySide6.QtGui import (
     QAction,
     QKeySequence,
+    QPalette,
     QShortcut,
+    QStyleHints,
     QTextBlock,
     QTextCursor,
     QTextDocument,
     QTextFragment,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QLabel,
     QLayout,
@@ -38,6 +41,8 @@ from PySide6.QtWidgets import (
     QMenuBar,
     QSizePolicy,
     QStatusBar,
+    QStyle,
+    QStyleFactory,
     QTextEdit,
     QToolButton,
     QWidget,
@@ -56,6 +61,58 @@ Q = TypeVar("Q", bound=QObject)
 T = TypeVar("T")
 
 F: TypeAlias = Callable[[], None]
+
+
+class Application(QApplication):
+    def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.theme = "Fusion"
+        self.mode = mode
+
+    @property
+    def style_hints(self) -> QStyleHints:
+        return super().styleHints()
+
+    @property
+    def theme(self) -> QStyle:
+        return super().style()
+
+    @theme.setter
+    def theme(self, value: str | QStyle, /) -> None:
+        super().setStyle(value)
+
+    @property
+    def mode(self) -> Literal["light", "dark", "unknown"]:
+        match super().styleHints().colorScheme():
+            case Qt.ColorScheme.Light:
+                return "light"
+            case Qt.ColorScheme.Dark:
+                return "dark"
+            case _:
+                return "unknown"
+
+    @mode.setter
+    def mode(self, value: Literal["light", "dark", "system"], /) -> None:
+        match value:
+            case "light":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Light)
+
+                if sys.platform == "linux" and (fallback := QStyleFactory.create("windows")):
+                    # prevent Linux from injecting its own dark mode
+                    super().setPalette(fallback.standardPalette())
+
+            case "dark":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Dark)
+                super().setPalette(QPalette())
+                super().setStyle(QStyleFactory.create("Fusion"))
+
+            case "system":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Unknown)
+                super().setPalette(QPalette())
+                super().setStyle(QStyleFactory.create("Fusion"))
+
+            case _:
+                assert_never(value)
 
 
 class Action(QAction):
