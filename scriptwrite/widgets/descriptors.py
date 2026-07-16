@@ -4,10 +4,11 @@ from typing import Any, Generic, overload, Self, TypeVar
 
 from PySide6.QtCore import QObject
 
+from scriptwrite.types import Q
+
 E = TypeVar("E")
 K = TypeVar("K", bound=str)
 T = TypeVar("T")
-Q = TypeVar("Q", bound=QObject)
 
 
 def default_set_name(get_name: str) -> str:

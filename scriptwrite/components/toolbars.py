@@ -1,7 +1,6 @@
-from collections.abc import Callable
 from functools import partial
 import sys
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -10,10 +9,10 @@ else:
 
 from PySide6.QtWidgets import QMainWindow
 
-from scriptwrite.widgets.components import Entry, Shortcut, Toolbar, ToolbarActionGroup, ToolButton
+from scriptwrite.widgets.actions import Shortcut
+from scriptwrite.widgets.components import Toolbar, ToolbarActionGroup, ToolButton
 from scriptwrite.widgets.layouts import Box
-
-F: TypeAlias = Callable[[], None]
+from scriptwrite.widgets.text import Entry
 
 ButtonLabel = Literal[
     "find-next", "find-previous", "use-regex", "case-sensitive", "replace-one", "replace-all", "close"

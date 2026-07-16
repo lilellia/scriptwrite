@@ -1,11 +1,11 @@
 from collections.abc import Iterable
-import os
 from pathlib import Path
 import sys
 import textwrap
-from typing import cast, TypeVar
+from typing import cast
 
 from scriptwrite.config import Config
+from scriptwrite.types import W
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -17,44 +17,18 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QSplitter,
-    QWidget,
 )
 
 from scriptwrite import fs, parser, renderers
+from scriptwrite.components import EditorPane, FindToolBar, PreviewPane
 from scriptwrite.widgets import (
     Application,
     debouncable_timer,
-    EditorPane,
-    FindToolBar,
     MenuBar,
     MenuItemData,
-    PreviewPane,
-    SourceLineData,
     StatusBar,
 )
 
-Q = TypeVar("Q", bound=QWidget)
-
-
-def _extend_qt6_plugin_paths() -> None:
-    if not sys.platform.startswith("linux"):
-        return
-
-    os.environ.pop("QT_QPA_PLATFORMTHEME", None)
-
-    # try to find the system-wide plugins
-    system_paths = ["/usr/lib/qt6/plugins", "/usr/lib64/qt6/plugins", "/usr/lib/x86_64-linux-gnu/qt6/plugins"]
-    system_paths = [p for p in system_paths if Path(p).exists()]
-
-    if system_paths:
-        os.environ.setdefault("QT_IM_MODULE", "fcitx")
-
-        # add the system-wide plugins to the plugin search space
-        extension = ":".join(system_paths)
-        os.environ["QT_PLUGIN_PATH"] = f"{os.environ.get('QT_PLUGIN_PATH', '')}:{extension}".lstrip(":")
-
-
-_extend_qt6_plugin_paths()
 config = Config.load()
 
 _app = Application(["scriptwrite"], mode=config.mode)
@@ -107,7 +81,7 @@ class LiveEditor(QMainWindow):
         symbol = "*" if self._dirty else "-"
         self.title = f"scriptwrite {symbol} {self._filepath or 'untitled'}"
 
-    def add_pane(self, widget: Q) -> Q:
+    def add_pane(self, widget: W) -> W:
         """Add the given widget as an application pane."""
         self._split.addWidget(widget)
         return widget
@@ -160,22 +134,11 @@ class LiveEditor(QMainWindow):
             self._preview.scroll_to_source_line(line)
 
     def _reverse_scroll_sync(self, *, force: bool = False) -> None:
-        line, _ = self._preview._cursor.position
+        if (source_line := self._preview.get_current_source_line()) is not None:
+            target = cast(QTextBlock, self._editor.get_block_at_line(source_line))
 
-        block = cast(QTextBlock, self._preview.get_block_at_line(line))
-
-        if (data := block.userData()) is None:
-            self._status_bar.ephemeral("Scroll sync failure: preview line does not contain reference")
-            return
-
-        if not isinstance(data, SourceLineData):
-            self._status_bar.ephemeral("Scroll sync failure: preview line does not contain source line data")
-            return
-
-        target = cast(QTextBlock, self._editor.get_block_at_line(data.source_line))
-
-        with self._editor.suppress_signals():
-            self._editor.scroll_to_block(target, align_top=True)
+            with self._editor.suppress_signals():
+                self._editor.scroll_to_block(target, align_top=True)
 
     def _new_file(self) -> None:
         """Create a new file in the editor. If the current document has changed, prompt save."""

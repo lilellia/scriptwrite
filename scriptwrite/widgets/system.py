@@ -1,0 +1,121 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+from os import PathLike
+from pathlib import Path
+import sys
+from typing import Any, assert_never, Literal
+
+from PySide6.QtCore import QFileSystemWatcher, QObject, Qt
+from PySide6.QtGui import QPalette, QStyleHints
+from PySide6.QtWidgets import QApplication, QStyle, QStyleFactory
+
+from scriptwrite.types import F
+from scriptwrite.widgets.signals import QtSignalProperty
+
+
+class Application(QApplication):
+    def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.theme = "Fusion"
+        self.mode = mode
+
+    @property
+    def style_hints(self) -> QStyleHints:
+        return super().styleHints()
+
+    @property
+    def theme(self) -> QStyle:
+        return super().style()
+
+    @theme.setter
+    def theme(self, value: str | QStyle, /) -> None:
+        super().setStyle(value)
+
+    @property
+    def mode(self) -> Literal["light", "dark", "system"]:
+        match super().styleHints().colorScheme():
+            case Qt.ColorScheme.Light:
+                return "light"
+            case Qt.ColorScheme.Dark:
+                return "dark"
+            case _:
+                return "system"
+
+    @mode.setter
+    def mode(self, value: Literal["light", "dark", "system"], /) -> None:
+        match value:
+            case "light":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Light)
+
+                if sys.platform == "linux" and (fallback := QStyleFactory.create("windows")):
+                    # prevent Linux from injecting its own dark mode
+                    super().setPalette(fallback.standardPalette())
+
+            case "dark":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Dark)
+                super().setPalette(QPalette())
+                super().setStyle(QStyleFactory.create("Fusion"))
+
+            case "system":
+                super().styleHints().setColorScheme(Qt.ColorScheme.Unknown)
+                super().setPalette(QPalette())
+                super().setStyle(QStyleFactory.create("Fusion"))
+
+            case _:
+                assert_never(value)
+
+
+class FileWatcher(QFileSystemWatcher):
+    _on_directory_change: QtSignalProperty = QtSignalProperty("directoryChanged")
+
+    def __init__(
+        self,
+        path: str | PathLike[str],
+        parent: QObject | None = None,
+        *args: Any,
+        on_change: F | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(parent, *args, **kwargs)
+        self._path = Path(path)
+
+        try:
+            self._mtime = self._path.stat().st_mtime
+        except FileNotFoundError as e:
+            raise ValueError(f"Cannot watch nonexistent file {path}") from e
+
+        self.on_change = on_change
+        self._on_directory_change = self.__on_directory_change__
+        self.bind()
+
+    @property
+    def directory(self) -> Path:
+        return self._path.parent
+
+    def bind(self) -> None:
+        if str(self.directory) not in super().directories() and self._path.exists():
+            super().addPath(str(self.directory))
+
+    @contextmanager
+    def suppress_signals(self) -> Iterator[None]:
+        super().blockSignals(True)
+        try:
+            yield
+        finally:
+            super().blockSignals(False)
+
+    def __on_directory_change__(self) -> None:
+        self.bind()
+
+        try:
+            mtime = self._path.stat().st_mtime
+        except FileNotFoundError:
+            # file was deleted
+            # possibly an atomic write, in which case we should get another trigger on the write
+            pass
+        else:
+            if mtime > self._mtime:
+                self._mtime = mtime
+
+                if self.on_change:
+                    self.on_change()

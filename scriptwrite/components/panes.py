@@ -1,8 +1,10 @@
 import re
 import sys
-from typing import Any
+from typing import Any, cast
 
-from scriptwrite.widgets.utils import anchors_of
+from scriptwrite import renderers
+from scriptwrite.log import logger
+from scriptwrite.widgets.text import anchors_of, TextArea
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -10,9 +12,6 @@ else:
     from typing_extensions import override
 
 from PySide6.QtGui import QTextBlock, QTextBlockUserData
-
-from scriptwrite import renderers
-from scriptwrite.widgets.components import TextArea
 
 
 class EditorPane(TextArea):
@@ -47,6 +46,22 @@ class PreviewPane(TextArea):
                         source_line = int(match.group(1), 10)
                         self._source_line_map[source_line] = block
                         block.setUserData(SourceLineData(source_line))
+
+    def get_current_source_line(self) -> int | None:
+        """Return the line number of the source that points to the line containing the cursor."""
+        line, _ = self._cursor.position
+
+        block = cast(QTextBlock, self.get_block_at_line(line))
+
+        if (data := block.userData()) is None:
+            logger.debug(f"Scroll sync failure: preview line {block.text()!r} does not contain reference")
+            return None
+
+        if not isinstance(data, SourceLineData):
+            logger.debug(f"Scroll sync failure: preview line {block.text()!r} does not contain source line data")
+            return None
+
+        return data.source_line
 
     def scroll_to_source_line(self, line: int) -> None:
         target = self._source_line_map.get(line, None)
