@@ -267,11 +267,11 @@ class LiveEditor(QMainWindow):
             if event:
                 event.ignore()
 
-    def _find(self, forward: bool, use_regex: bool, case_sensitive: bool) -> None:
+    def _find(self, needle: str, forward: bool, use_regex: bool, case_sensitive: bool) -> None:
         # TODO
         pass
 
-    def _replace(self, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None:
+    def _replace(self, needle: str, replacement: str, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None:
         # TODO
         pass
 

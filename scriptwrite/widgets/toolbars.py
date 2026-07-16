@@ -21,11 +21,13 @@ ButtonLabel = Literal[
 
 
 class FindFunction(Protocol):
-    def __call__(self, forward: bool, use_regex: bool, case_sensitive: bool) -> None: ...
+    def __call__(self, needle: str, forward: bool, use_regex: bool, case_sensitive: bool) -> None: ...
 
 
 class ReplaceFunction(Protocol):
-    def __call__(self, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None: ...
+    def __call__(
+        self, needle: str, replacement: str, replace_all: bool, use_regex: bool, case_sensitive: bool
+    ) -> None: ...
 
 
 class FindToolBar(Toolbar):
@@ -84,18 +86,32 @@ class FindToolBar(Toolbar):
         self._escape = Shortcut("Escape", self, callback=self.hide, scope="contained")
 
     @property
+    def needle(self) -> str:
+        return self.search_input.content
+
+    @property
+    def replacement(self) -> str:
+        return self.replace_input.content
+
+    @property
     def use_regex(self) -> bool:
-        return self._buttons["use-regex"].isChecked()
+        return self._buttons["use-regex"].checked
 
     @property
     def case_sensitive(self) -> bool:
-        return self._buttons["case-sensitive"].isChecked()
+        return self._buttons["case-sensitive"].checked
 
     def find_impl(self, f: FindFunction, forward: bool) -> None:
-        f(forward=forward, use_regex=self.use_regex, case_sensitive=self.case_sensitive)
+        f(needle=self.needle, forward=forward, use_regex=self.use_regex, case_sensitive=self.case_sensitive)
 
     def replace_impl(self, r: ReplaceFunction, replace_all: bool) -> None:
-        r(replace_all=replace_all, use_regex=self.use_regex, case_sensitive=self.case_sensitive)
+        r(
+            needle=self.needle,
+            replacement=self.replacement,
+            replace_all=replace_all,
+            use_regex=self.use_regex,
+            case_sensitive=self.case_sensitive,
+        )
 
     @override
     def toggle(self) -> None:

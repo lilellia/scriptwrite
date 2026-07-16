@@ -217,6 +217,7 @@ class ToolButton(QToolButton):
     action: QtProperty[Action] = QtProperty("defaultAction")
     auto_raise: QtProperty[bool] = QtProperty("autoRaise")
     checkable: QtProperty[bool] = QtProperty(getter="isCheckable", setter="setCheckable")
+    checked: QtProperty[bool] = QtProperty(getter="isChecked", setter="setChecked")
     button_style: QtEnum[Literal["follow", "icon", "text-beside-icon", "text", "text-under-icon"]] = QtEnum(
         "toolButtonStyle",
         {
@@ -253,11 +254,10 @@ class Frame(QFrame):
     frame_shadow: QtEnum[Literal["none", "raised", "sunken"]] = QtEnum(
         "frameShadow", {"none": QFrame.Shadow.Plain, "sunken": QFrame.Shadow.Sunken, "raised": QFrame.Shadow.Raised}
     )
+    autofill_bg: QtProperty[bool] = QtProperty("autoFillBackground")
 
 
 class Toolbar(Frame):
-    autofill_bg: QtProperty[bool] = QtProperty("autoFillBackground")
-
     def __init__(self, parent: QMainWindow, *args: Any, **kwargs: Any) -> None:
         super().__init__(parent, *args, **kwargs)
 
@@ -368,7 +368,8 @@ class ToolbarActionGroup:
 
 class Entry(QLineEdit):
     width_: QtProperty[int] = QtProperty("width", "setFixedWidth")
-    on_change: QtSignalProperty = QtSignalProperty(signal_name="textChanged")
+    content: QtProperty[str] = QtProperty("text")
+    on_change: QtSignalProperty = QtSignalProperty("textChanged")
 
 
 class _HTMLInjector(HTMLParser):
