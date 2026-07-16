@@ -20,13 +20,13 @@ from PySide6.QtWidgets import (
 )
 
 from scriptwrite import fs, parser, renderers
-from scriptwrite.components import EditorPane, FindToolBar, PreviewPane
+from scriptwrite.features import EditorPane, FindToolBar, PreviewPane
 from scriptwrite.widgets import (
     Application,
-    debouncable_timer,
     MenuBar,
     MenuItemData,
     StatusBar,
+    Timer,
 )
 
 config = Config.load()
@@ -61,7 +61,7 @@ class LiveEditor(QMainWindow):
 
         self._dirty: bool = False
 
-        self._render_timer = debouncable_timer(msecs=200, callback=self._compile)
+        self._render_timer = Timer(duration=200, callback=self._compile)
 
     @property
     def title(self) -> str:

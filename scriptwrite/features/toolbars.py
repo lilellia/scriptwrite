@@ -10,9 +10,9 @@ else:
 from PySide6.QtWidgets import QMainWindow
 
 from scriptwrite.widgets.actions import Shortcut
-from scriptwrite.widgets.components import Toolbar, ToolbarActionGroup, ToolButton
 from scriptwrite.widgets.layouts import Box
 from scriptwrite.widgets.text import Entry
+from scriptwrite.widgets.toolbars import Toolbar, ToolbarActionGroup, ToolButton
 
 ButtonLabel = Literal[
     "find-next", "find-previous", "use-regex", "case-sensitive", "replace-one", "replace-all", "close"

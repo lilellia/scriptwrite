@@ -1,32 +1,17 @@
-from __future__ import annotations
-
 import sys
 from typing import Any, cast, Self
-
-from scriptwrite.widgets.actions import Action, ToolButton
-from scriptwrite.widgets.frame import Frame
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtWidgets import (
-    QLayout,
-    QMainWindow,
-    QSizePolicy,
-)
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtWidgets import QLayout, QMainWindow, QSizePolicy
 
 from scriptwrite.types import F
-
-
-def debouncable_timer(msecs: int, callback: F) -> QTimer:
-    """Create a timer with the given delay that executes the given callback when time elapses."""
-    timer = QTimer(singleShot=True, interval=msecs)
-    timer.timeout.connect(callback)
-
-    return timer
+from scriptwrite.widgets.actions import Action, ToolButton
+from scriptwrite.widgets.frame import Frame
 
 
 class Toolbar(Frame):
