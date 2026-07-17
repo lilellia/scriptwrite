@@ -7,8 +7,6 @@ if TYPE_CHECKING:
     # TextArea holds a reference to Cursor, so we end up in an import cycle without the TYPE_CHECKING guard
     from scriptwrite.widgets.text import TextArea
 
-from scriptwrite.log import logger
-
 
 def convert_string_index_to_utf16(text: str, idx: int) -> int:
     """Convert a Python character index to a Qt UTF-16 position."""

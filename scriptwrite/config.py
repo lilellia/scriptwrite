@@ -20,6 +20,6 @@ class Config:
             logger.warning(f"config file {path} not found")
             return cls()
 
-        with open(APP_DIRS.config, "config.yaml") as f:
+        with open(path, "r", encoding="utf-8") as f:
             kwargs = YAML(typ="safe").load(f)
             return cls(kwargs)

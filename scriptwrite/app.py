@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
 from scriptwrite import fs, parser, renderers
 from scriptwrite.config import Config
 from scriptwrite.features import EditorPane, FindToolBar, PreviewPane
-from scriptwrite.log import logger
 from scriptwrite.types import W
 from scriptwrite.widgets import (
     Application,
