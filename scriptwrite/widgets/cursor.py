@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 def convert_string_index_to_utf16(text: str, idx: int) -> int:
     """Convert a Python character index to a Qt UTF-16 position."""
-    return len(text[:idx].encode("utf-16-le")) // 2
+    return sum(2 if ord(char) else 1 for char in text[:idx])
 
 
 def convert_utf16_index_to_python(text: str, idx: int) -> int:
@@ -20,7 +20,7 @@ def convert_utf16_index_to_python(text: str, idx: int) -> int:
         if qindex >= idx:
             return py_index
 
-        qindex += len(char.encode("utf-16-le")) // 2
+        qindex += 2 if ord(char) > 0xFFFF else 1
 
     return len(text)
 
@@ -32,7 +32,7 @@ def build_qindex_map(text: str) -> dict[int, int]:
     index = qindex = 0
     for index, char in enumerate(text):
         mapping[index] = qindex
-        qindex += len(char.encode("utf-16-le")) // 2
+        qindex += 2 if ord(char) > 0xFFFF else 1
 
     mapping[index] = qindex
 
