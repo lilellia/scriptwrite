@@ -3,7 +3,9 @@ from pathlib import Path
 import re
 import sys
 import textwrap
-from typing import Callable, cast
+from typing import cast
+
+from scriptwrite.utils import discard, find_text, make_needle
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -50,7 +52,7 @@ class LiveEditor(QMainWindow):
         self._editor.on_cursor_move = self._scroll_sync
         self._preview.on_cursor_move = self._reverse_scroll_sync
 
-        self._find_toolbar = FindToolBar(self, self._find, self._replace).bind()
+        self._find_toolbar = FindToolBar(self, discard(self._find), self._replace).bind()
 
         self._menubar = self._init_menu()
         self._status_bar = self._init_status_bar()
@@ -235,72 +237,47 @@ class LiveEditor(QMainWindow):
             if event:
                 event.ignore()
 
-    def _find(self, needle: str, forward: bool, use_regex: bool, case_sensitive: bool) -> None:
+    def _find(
+        self, needle: str, forward: bool, use_regex: bool, case_sensitive: bool, *, force: bool = False
+    ) -> re.Match[str] | None:
         if not needle:
             return
 
         haystack = self._editor.content
 
-        flags = re.MULTILINE
-        if not case_sensitive:
-            flags |= re.IGNORECASE
+        pattern = make_needle(needle, use_regex=use_regex, case_sensitive=case_sensitive)
+        ctx = self._editor._cursor.context()
 
-        cursor = self._editor._cursor
-        pos = cursor.get_index()
-
-        pattern = re.compile(needle if use_regex else re.escape(needle), flags)
-        matches = list(pattern.finditer(haystack))
-
-        if not matches:
-            self._find_toolbar.set_label(0, 0)
+        if not (result := find_text(pattern, haystack, forward, ctx, force=force)):
+            self._status_bar.ephemeral("No matches found")
             return
 
-        def _match(
-            match_list: list[re.Match[str]], filter: Callable[[int, int], bool], wrap_around_message: str
-        ) -> int:
-            i = 1
-            for i, match in enumerate(match_list, start=1):
-                span = match.span()
+        self._editor._cursor.select(*result.match.span())
+        self._find_toolbar.set_label(result.index, result.num_matches)
 
-                def _is_same_selection():
-                    if not (sel := self._editor._cursor.selected_range):
-                        return False
+        if result.wraparound:
+            template = "Reached {} of page, continuing from the {}"
+            args = ("bottom", "top") if forward else ("top", "bottom")
+            self._status_bar.ephemeral(template.format(*args))
 
-                    return span[0] == sel[0] and match.group(0) == self._editor._cursor.selected_text
-
-                if _is_same_selection():
-                    # we're sitting on a match and being asked to forcibly match beyond it
-                    continue
-
-                if filter(*span):
-                    self._editor._cursor.select(*span)
-                    return i
-            else:
-                # there were no matches after the cursor
-                self._editor._cursor.select(*match_list[0].span())
-                self._status_bar.ephemeral(wrap_around_message)
-                return 1
-
-        if forward:
-            i = _match(
-                matches,
-                filter=lambda a, _: a >= pos,
-                wrap_around_message="Reached bottom of page, continuing from top",
-            )
-        else:
-            i = _match(
-                list(reversed(matches)),
-                filter=lambda _, b: b <= pos,
-                wrap_around_message="Reached top of page, continuing from bottom",
-            )
-
-            i = len(matches) - i + 1
-
-        self._find_toolbar.set_label(i, len(matches))
+        return result.match
 
     def _replace(self, needle: str, replacement: str, replace_all: bool, use_regex: bool, case_sensitive: bool) -> None:
-        # TODO
-        pass
+        if replace_all:
+            # the easy case - just do a straight text replacement across the document
+            pattern = make_needle(needle, use_regex=use_regex, case_sensitive=case_sensitive)
+            self._editor.content = re.sub(pattern, replacement, self._editor.content)
+            return
+
+        if not (
+            match := self._find(needle, forward=True, use_regex=use_regex, case_sensitive=case_sensitive, force=True)
+        ):
+            return
+
+        start, end = match.span()
+        repl = match.expand(replacement)
+        self._editor.content = self._editor.content[:start] + repl + self._editor.content[end:]
+        self._editor._cursor.select(start, start + len(repl))
 
     def _on_change(self) -> None:
         """Called when the editor pane's content changes. Registers the update for the preview pane."""

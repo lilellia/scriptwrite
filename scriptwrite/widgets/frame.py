@@ -22,4 +22,3 @@ class Frame(QFrame):
     frame_shadow: QtEnum[Literal["none", "raised", "sunken"]] = QtEnum(
         "frameShadow", {"none": QFrame.Shadow.Plain, "sunken": QFrame.Shadow.Sunken, "raised": QFrame.Shadow.Raised}
     )
-    autofill_bg: QtProperty[bool] = QtProperty("autoFillBackground")

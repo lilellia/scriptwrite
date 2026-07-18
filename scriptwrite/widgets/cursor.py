@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import cast, NamedTuple, TYPE_CHECKING
 
 from PySide6.QtGui import QTextBlock, QTextCursor
@@ -42,6 +43,13 @@ def build_qindex_map(text: str) -> dict[int, int]:
 class CursorPosition(NamedTuple):
     line: int
     column: int
+
+
+@dataclass(slots=True, frozen=True)
+class CursorContext:
+    index: int
+    selected_range: tuple[int, int] | None
+    selected_text: str
 
 
 class Cursor:
@@ -133,3 +141,8 @@ class Cursor:
     def update(self, cur: QTextCursor) -> None:
         self._parent.setTextCursor(cur)
         self._parent.ensureCursorVisible()
+
+    def context(self) -> CursorContext:
+        return CursorContext(
+            index=self.get_index(), selected_range=self.selected_range, selected_text=self.selected_text
+        )
