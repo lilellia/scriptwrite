@@ -1,20 +1,26 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+import os
 from os import PathLike
 from pathlib import Path
 import sys
 from typing import Any, assert_never, Literal
 
-from PySide6.QtCore import QFileSystemWatcher, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Qt
 from PySide6.QtGui import QPalette, QStyleHints
 from PySide6.QtWidgets import QApplication, QStyle, QStyleFactory
 
+from scriptwrite.log import logger
 from scriptwrite.types import F
 from scriptwrite.widgets.signals import QtSignalProperty
 
 
 class Application(QApplication):
     def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
+        if sys.platform.startswith("linux"):
+            self._force_ime()
+            self._extend_qt6_plugin_paths()
+
         super().__init__(*args, **kwargs)
         self.theme = "Fusion"
         self.mode = mode
@@ -63,6 +69,19 @@ class Application(QApplication):
 
             case _:
                 assert_never(value)
+
+    @staticmethod
+    def _force_ime() -> None:
+        os.environ.setdefault("QT_IM_MODULE", "fcitx")
+
+    @staticmethod
+    def _extend_qt6_plugin_paths() -> None:
+        pool = ["/usr/lib/qt6/plugins", "/usr/lib64/qt6/plugins", "/usr/lib/x86_64-linux-gnu/qt6/plugins"]
+
+        for path in pool:
+            if Path(path).exists():
+                logger.info(f"Adding plugin path: {path}")
+                QCoreApplication.addLibraryPath(path)
 
 
 class FileWatcher(QFileSystemWatcher):
