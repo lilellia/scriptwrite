@@ -1,13 +1,14 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import reduce
 from typing import Any, Generic, overload, Self, TypeVar
 
 from PySide6.QtCore import QObject
 
-from scriptwrite.types import Q
+from scriptwrite.types import Q, QtValueType
 
 E = TypeVar("E")
 K = TypeVar("K", bound=str)
+S = TypeVar("S")
 T = TypeVar("T")
 
 
@@ -20,10 +21,18 @@ def deep_getattr(obj: Any, dotted_name: str) -> Any:
     return reduce(lambda acc, attr: getattr(acc, attr), components, initial=obj)
 
 
-class QtProperty(Generic[T]):
-    def __init__(self, getter: str, setter: str | None = None) -> None:
+def _identity(x: T) -> T:
+    return x
+
+
+class QtMappedProperty(Generic[S, T]):
+    def __init__(
+        self, getter: str, f: Callable[[S], T], inv: Callable[[Any], T] = _identity, setter: str | None = None
+    ) -> None:
         self._get_name = getter
         self._set_name = setter or default_set_name(getter)
+        self._map = f
+        self._inv = inv
 
     @overload
     def __get__(self, instance: None, owner: type[Q], /) -> Self: ...
@@ -36,14 +45,19 @@ class QtProperty(Generic[T]):
             return self
 
         get = deep_getattr(instance, self._get_name)
-        return get()
+        return self._inv(get())
 
-    def __set__(self, instance: QObject | None, value: T, /) -> None:
+    def __set__(self, instance: QObject | QtValueType | None, value: S, /) -> None:
         if instance is None:
             return
 
         set = deep_getattr(instance, self._set_name)
-        set(value)
+        set(self._map(value))
+
+
+class QtProperty(QtMappedProperty[T, T]):
+    def __init__(self, getter: str, setter: str | None = None):
+        super().__init__(getter=getter, setter=setter, f=_identity, inv=_identity)
 
 
 class QtEnum(Generic[K]):
@@ -70,7 +84,7 @@ class QtEnum(Generic[K]):
         e = get()
         return self._enum_to_key[e]
 
-    def __set__(self, instance: QObject | None, value: K, /) -> None:
+    def __set__(self, instance: QObject | QtValueType | None, value: K, /) -> None:
         if instance is None:
             return
 

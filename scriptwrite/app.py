@@ -162,6 +162,8 @@ class LiveEditor(QMainWindow):
         self._compile()
 
         self._status_bar.ephemeral(f"Loaded: {path}")
+        with self._editor.suppress_signals():
+            self._editor._highlighter.rehighlight()
 
     def _get_open_file(self) -> None:
         """Query the user for the path to open. If the current document has changed, ask them to save."""

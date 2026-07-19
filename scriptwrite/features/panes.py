@@ -1,9 +1,12 @@
+from enum import IntEnum
 import re
 import sys
 from typing import Any, cast
 
 from scriptwrite import renderers
 from scriptwrite.log import logger
+from scriptwrite.widgets import qre
+from scriptwrite.widgets.display import SyntaxHighlighter, TextStyle
 from scriptwrite.widgets.text import anchors_of, TextArea
 
 if sys.version_info >= (3, 12):
@@ -18,6 +21,84 @@ class EditorPane(TextArea):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         super().setAcceptRichText(False)
+        self._highlighter = Highlighter(self.doc)
+
+
+class _BlockState(IntEnum):
+    UNINITIALIZED = -1
+
+    YAML_HEADER_OPEN = 1
+    YAML_HEADER_CLOSED = 2
+
+    HTML_COMMENT_OPEN = 4
+
+
+class Highlighter(SyntaxHighlighter):
+    def highlight_yaml_header(self, text: str) -> None:
+        style = TextStyle(fg="#FFFFFF").dimmed(0.4)
+
+        if self.previous_block_state == _BlockState.UNINITIALIZED:
+            # first line of the file
+            if text.strip() == "---":
+                self.block_state = _BlockState.YAML_HEADER_OPEN
+                self.apply(style, 0, len(text))
+            else:
+                # the first line wasn't a header opening, so there can be no header
+                self.block_state = _BlockState.YAML_HEADER_CLOSED
+
+        elif self.previous_block_state & _BlockState.YAML_HEADER_OPEN:
+            self.block_state = _BlockState.YAML_HEADER_CLOSED if text.strip() == "---" else _BlockState.YAML_HEADER_OPEN
+            self.apply(style, 0, len(text))
+
+        else:
+            self.block_state = _BlockState.YAML_HEADER_CLOSED
+
+    def highlight_color_attribute(self, text: str) -> None:
+        if match := qre.search(r"\bcolou?r: ([0-9A-Fa-f]{6})\b", text):
+            style = TextStyle(fg=f"#{match.group(1)}")
+            self.apply(style, *match.span())
+
+    def highlight_html_comment(self, text: str) -> None:
+        style = TextStyle(fg="#FFFFFF").dimmed(0.15)
+
+        if (state := self.previous_block_state) == _BlockState.UNINITIALIZED:
+            state = 0
+
+        if state & _BlockState.HTML_COMMENT_OPEN:
+            if match := qre.search(r"-->", text):
+                # there's a closing tag
+                end = match.end()
+                self.block_state &= ~_BlockState.HTML_COMMENT_OPEN
+            else:
+                end = len(text)
+                self.block_state |= _BlockState.HTML_COMMENT_OPEN
+
+            self.apply(style, 0, end)
+
+        else:
+            # there isn't already an open comment
+
+            if match := qre.search(r"<!--", text):
+                # there's an opening tag
+                start = match.start()
+
+                if match := qre.search(r"-->", text):
+                    # there's also a closing tag
+                    end = match.end()
+                    self.block_state &= ~_BlockState.HTML_COMMENT_OPEN
+                else:
+                    end = len(text)
+                    self.block_state |= _BlockState.HTML_COMMENT_OPEN
+
+                self.apply(style, start, end)
+            else:
+                self.block_state &= ~_BlockState.HTML_COMMENT_OPEN
+
+    @override
+    def highlightBlock(self, text: str, /) -> None:
+        self.highlight_yaml_header(text)
+        self.highlight_html_comment(text)
+        self.highlight_color_attribute(text)
 
 
 class SourceLineData(QTextBlockUserData):
