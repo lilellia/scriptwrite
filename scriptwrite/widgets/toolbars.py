@@ -1,3 +1,4 @@
+from itertools import pairwise
 import sys
 from typing import Any, cast, Self
 
@@ -7,7 +8,7 @@ else:
     from typing_extensions import override
 
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtWidgets import QLayout, QMainWindow, QSizePolicy
+from PySide6.QtWidgets import QLayout, QMainWindow, QSizePolicy, QWidget
 
 from scriptwrite.types import F
 from scriptwrite.widgets.actions import Action, ToolButton
@@ -93,6 +94,23 @@ class Toolbar(Frame):
 
         super().hide()
         return self
+
+    def set_tab_order(self, *widgets: QWidget, cycle: bool = True) -> None:
+        """Set the tab order for the given widgets.
+
+        Example 1:
+            self.tab_order(A, B, C, D, cycle=True)
+            A -> B -> C -> D -> A
+
+        Example 2:
+            self.tab_order(A, B, C, D, cycle=False)
+            A -> B -> C -> D -> nowhere
+        """
+        for prev, curr in pairwise(widgets):
+            super().setTabOrder(prev, curr)
+
+        if cycle and widgets:
+            super().setTabOrder(widgets[-1], widgets[0])
 
 
 class ToolbarActionGroup:

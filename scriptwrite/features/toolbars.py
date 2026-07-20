@@ -47,23 +47,27 @@ class FindToolBar(Toolbar):
                 self.search_input = row1.add(Entry(self, placeholder="Find...", width=200, on_change=_find_next))
 
                 self._buttons["find-previous"] = row1.add(
-                    self.add_action("«", tooltip="Find Previous", callback=_find_prev)
+                    self.add_action("«", tooltip="Find Previous\n(Alt+Left, Alt+P)", callback=_find_prev)
                 )
 
-                self._buttons["find-next"] = row1.add(self.add_action("»", tooltip="Find Next", callback=_find_next))
+                self._buttons["find-next"] = row1.add(
+                    self.add_action("»", tooltip="Find Next\n(Alt+Right, Alt+N)", callback=_find_next)
+                )
 
                 self._buttons["case-sensitive"] = row1.add(
-                    self.add_action("Aa", tooltip="Case Sensitive", checkable=True)
+                    self.add_action("Aa", tooltip="Toggle Case Sensitive\n(Alt+C)", checkable=True)
                 )
 
                 self._buttons["use-regex"] = row1.add(
-                    self.add_action(".*", tooltip="Use Regex Patterns", checkable=True)
+                    self.add_action(".*", tooltip="Toggle Regex Patterns\n(Alt+R)", checkable=True)
                 )
 
-                self._buttons["close"] = row1.add(self.add_action("×", tooltip="Close Toolbar", callback=self.hide))
+                self._buttons["close"] = row1.add(
+                    self.add_action("×", tooltip="Close Toolbar\n(Esc)", callback=self.hide)
+                )
 
             with Box(box, direction="horizontal") as row2:
-                self.replace_input = row2.add(Entry(self, placeholderText="Replace..."))
+                self.replace_input = row2.add(Entry(self, placeholder="Replace..."))
                 self.replace_input.width_ = 200
 
                 self._buttons["replace-one"] = row2.add(
@@ -78,9 +82,27 @@ class FindToolBar(Toolbar):
 
         ToolbarActionGroup(*self._buttons.values()).sync_widths()
         self.force_minimal_size()
-        # allow Esc to close the toolbar
-        # as long as it (or its children) are focused
-        self._escape = Shortcut("Escape", self, callback=self.hide, scope="contained")
+
+        self.set_tab_order(self.search_input, self.replace_input, *self._buttons.values())
+
+        self._shortcuts = self._init_shortcuts()
+
+    def _init_shortcuts(self) -> list[Shortcut]:
+        map = {
+            # hide toolbar
+            "Escape": self.hide,
+            # toggle button states
+            "Alt+C": self._buttons["case-sensitive"].toggle,
+            "Alt+R": self._buttons["use-regex"].toggle,
+            # find next
+            "Alt+N": self._buttons["find-next"].action.trigger,
+            "Alt+Right": self._buttons["find-next"].action.trigger,
+            # find previous
+            "Alt+P": self._buttons["find-previous"].action.trigger,
+            "Alt+Left": self._buttons["find-previous"].action.trigger,
+        }
+
+        return [Shortcut(key, self, callback=func, scope="contained") for key, func in map.items()]
 
     @property
     def needle(self) -> str:

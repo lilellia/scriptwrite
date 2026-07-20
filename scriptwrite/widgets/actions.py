@@ -65,6 +65,10 @@ class Action(QAction):
         target.addAction(self)
         return self
 
+    def toggle(self) -> None:
+        if self.checkable:
+            self.checked = not self.checked
+
 
 class Shortcut(QShortcut):
     callback: QtSignalProperty = QtSignalProperty("activated")
