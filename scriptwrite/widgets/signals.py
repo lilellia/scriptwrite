@@ -37,9 +37,16 @@ class _WeakSlotInfo:
     kwargs: dict[str, Any]
 
 
+@dataclass(slots=True, frozen=True)
+class _StrongSlotInfo:
+    function: Slot
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+
+
 class WeakSlot:
     def __init__(self, f: F) -> None:
-        self._context: _WeakSlotPointer | _WeakSlotInfo
+        self._context: _WeakSlotPointer | _WeakSlotInfo | _StrongSlotInfo
 
         if isinstance(f, partial):
             args: tuple[Any, ...] = f.args
@@ -58,7 +65,7 @@ class WeakSlot:
                 self._context = _WeakSlotInfo(weak_instance=ref(instance), method=f.__name__, args=args, kwargs=kwargs)
         else:
             # normal Python function
-            self._context = _WeakSlotPointer(weak_function=ref(f), args=args, kwargs=kwargs)
+            self._context = _StrongSlotInfo(function=f, args=args, kwargs=kwargs)
 
     def _get_function(self) -> F | None:
         match self._context:
@@ -69,6 +76,9 @@ class WeakSlot:
             case _WeakSlotInfo(weak_instance, method, args, kwargs):
                 if (obj := weak_instance()) and (f := getattr(obj, method, None)):
                     return partial(f, *args, **kwargs)
+
+            case _StrongSlotInfo(f, args, kwargs):
+                return partial(f, *args, **kwargs)
 
     def __call__(self, *_: Any, **__: Any) -> None:
         if f := self._get_function():
