@@ -193,7 +193,7 @@ def parse_text(content: str) -> Script:
     unspoken_words = 0
 
     previous_speaker: Character | None = None
-    for index, line in enumerate(body.splitlines(), start=offset):
+    for index, line in enumerate(body.splitlines(), start=offset + 1):
         if not line.strip():
             continue
 
