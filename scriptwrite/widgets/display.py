@@ -1,8 +1,8 @@
 from typing import Self, TypedDict, Unpack
 from weakref import ref
 
-from PySide6.QtCore import QObject
-from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtCore import QObject, QRectF
+from PySide6.QtGui import QColor, QPaintDevice, QPainter, QSyntaxHighlighter, QTextCharFormat
 
 from scriptwrite.types import QtValueType
 from scriptwrite.widgets.descriptors import QtProperty
@@ -200,3 +200,9 @@ class SyntaxHighlighter(QSyntaxHighlighter):
 
     def apply(self, style: TextStyle, start: int, stop: int) -> None:
         super().setFormat(start, stop - start, style)
+
+
+def fill_rect(surface: QPaintDevice, x: float, y: float, width: float, height: float, color: Color) -> None:
+    painter = QPainter(surface)
+    painter.fillRect(QRectF(x, y, width, height), color._proxy)
+    painter.end()

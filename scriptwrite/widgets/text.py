@@ -6,10 +6,13 @@ import re
 import sys
 from typing import Any, cast
 
-from PySide6.QtGui import QTextBlock, QTextDocument, QTextFormat, QTextFragment
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QPaintEvent, QTextBlock, QTextDocument, QTextFormat, QTextFragment
 from PySide6.QtWidgets import QLabel, QLineEdit, QTextEdit, QWidget
 
+from scriptwrite.widgets.actions import AnimatedAction
 from scriptwrite.widgets.cursor import Cursor
+from scriptwrite.widgets.display import Color, fill_rect
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -124,6 +127,15 @@ class TextArea(QTextEdit):
         self.on_cursor_move = on_cursor_move
         self._cursor = Cursor(parent=self)
 
+        # improve selection highlight colour contrast
+        self._selection_color = Color.from_hex("#3E5D74")
+        super().setStyleSheet(f""" QTextEdit {{ selection-background-color: {self._selection_color.as_hex()}; }} """)
+
+        # implement block highlighting
+        self._highlight_color = Color.from_hex("#FFF3CD")
+        self._highlighted_block: QTextBlock | None = None
+        self._highlight_animation: AnimatedAction[int] | None = None
+
     @property
     def doc(self) -> QTextDocument:
         return super().document()
@@ -141,9 +153,12 @@ class TextArea(QTextEdit):
     def html(self, s: str, /) -> None:
         self._set_html(s)
 
+    def _block_bbox(self, block: QTextBlock) -> QRectF:
+        return self.doc.documentLayout().blockBoundingRect(block)
+
     def align_screen_view_to_block(self, block: QTextBlock) -> None:
         viewport_height = super().viewport().height()
-        block_rect = self.doc.documentLayout().blockBoundingRect(block)
+        block_rect = self._block_bbox(block)
 
         y = block_rect.top() - (viewport_height * 0.5) + (block_rect.height() * 0.5)
         super().verticalScrollBar().setValue(int(y))
@@ -153,6 +168,34 @@ class TextArea(QTextEdit):
 
         if align:
             self.align_screen_view_to_block(block)
+
+    def highlight_current_block(self, *, duration: int = 2500) -> None:
+        self._highlighted_block = self._cursor.current_block()
+
+        def _remove_highlight() -> None:
+            self._highlighted_block = None
+
+        self._highlight_animation = AnimatedAction(
+            initial_value=0x30,
+            final_value=0,
+            length=duration,
+            ease="in-expo",
+            on_update=self.viewport().update,
+            on_finish=_remove_highlight,
+        )
+        self._highlight_animation.start()
+
+    @override
+    def paintEvent(self, event: QPaintEvent) -> None:
+        if self._highlighted_block:
+            assert self._highlight_animation is not None
+            color = self._highlight_color.with_alpha(self._highlight_animation.value)
+
+            bbox = self._block_bbox(self._highlighted_block)
+            y = bbox.top() - self.verticalScrollBar().value()
+            fill_rect(self.viewport(), x=0, y=y, width=self.viewport().width(), height=bbox.height(), color=color)
+
+        super().paintEvent(event)
 
     @contextmanager
     def suppress_signals(self) -> Iterator[None]:

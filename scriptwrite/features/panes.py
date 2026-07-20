@@ -119,6 +119,7 @@ class PreviewPane(TextArea):
         super()._set_html(s)
 
         # and now inject source line numbers
+        self._source_line_map.clear()
         pattern = re.compile(r"^data-source-line_eq_(\d+)$")
         for block in self.blocks():
             for fragment in type(self).fragments_of(block):

@@ -134,6 +134,7 @@ class LiveEditor(QMainWindow):
 
         with self._preview.suppress_signals():
             self._preview.scroll_to_source_line(line)
+            self._preview.highlight_current_block()
 
     def _reverse_scroll_sync(self, *, force: bool = False) -> None:
         if (source_line := self._preview.get_current_source_line()) is not None:
@@ -141,6 +142,8 @@ class LiveEditor(QMainWindow):
 
             with self._editor.suppress_signals():
                 self._editor.scroll_to_block(target, align=True)
+                self._editor.highlight_current_block()
+                self._editor.setFocus()
 
     def _new_file(self) -> None:
         """Create a new file in the editor. If the current document has changed, prompt save."""
