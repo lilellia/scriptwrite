@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 from PySide6.QtCore import QRegularExpression, QRegularExpressionMatch
 
-A = ASCII = 0xFFFF
+A = ASCII = 0x0008
 I = IGNORECASE = 0x0001  # noqa: E741 (ambiguous name; I is chosen to align with re.I)
 S = DOTALL = 0x0002
 M = MULTILINE = 0x0004
@@ -10,8 +10,10 @@ M = MULTILINE = 0x0004
 
 def _interpret_flags(flags: int) -> QRegularExpression.PatternOption:
     if flags & ASCII:
-        # specifically disable the non-ascii flag that Qt uses
-        flags ^= 0x0040
+        flags &= ~0x0040  # specifically disable the non-ascii flag that Qt uses
+        flags &= ~ASCII  # and drop the ASCII flag that Qt doesn't know about
+    else:
+        flags |= 0x0040  # force the non-ASCII option
 
     return QRegularExpression.PatternOption(flags)
 
