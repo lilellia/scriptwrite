@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast, NamedTuple, TYPE_CHECKING
@@ -9,35 +10,52 @@ if TYPE_CHECKING:
     from scriptwrite.widgets.text import TextArea
 
 
-def convert_string_index_to_utf16(text: str, idx: int) -> int:
+@dataclass(slots=True, frozen=True)
+class SurrogatePositions:
+    native: list[int]  # Python character indices
+    utf16: list[int]  # corresponding utf-16 positions
+
+    def __bool__(self) -> bool:
+        return bool(self.native)
+
+
+def get_surrogate_positions(text: str) -> SurrogatePositions:
+    """Return a list of all indices (in the native Python string) which correspond to surrogate pairs in UTF-16."""
+    if text.isascii():
+        return SurrogatePositions(native=[], utf16=[])
+
+    native: list[int] = []
+    utf16: list[int] = []
+
+    offset = 0
+
+    for i, char in enumerate(text):
+        if ord(char) > 0xFFFF:
+            native.append(i)
+            utf16.append(i + offset)
+            offset += 1
+
+    return SurrogatePositions(native, utf16)
+
+
+def convert_string_index_to_utf16(idx: int, surrogates: SurrogatePositions) -> int:
     """Convert a Python character index to a Qt UTF-16 position."""
-    return sum(2 if ord(char) else 1 for char in text[:idx])
+    if not surrogates:
+        # everything is <= 0xFFFF
+        return idx
+
+    offset = bisect_left(surrogates.native, idx)
+    return idx + offset
 
 
-def convert_utf16_index_to_python(text: str, idx: int) -> int:
+def convert_utf16_index_to_python(q_idx: int, surrogates: SurrogatePositions) -> int:
     """Convert a Qt UTF-16 position to a Python character index."""
-    qindex = 0
-    for py_index, char in enumerate(text):
-        if qindex >= idx:
-            return py_index
+    if not surrogates:
+        # everything is <= 0xFFFF
+        return q_idx
 
-        qindex += 2 if ord(char) > 0xFFFF else 1
-
-    return len(text)
-
-
-def build_qindex_map(text: str) -> dict[int, int]:
-    """Return a map of {index: qindex} for the given string."""
-    mapping: dict[int, int] = {0: 0}
-
-    index = qindex = 0
-    for index, char in enumerate(text):
-        mapping[index] = qindex
-        qindex += 2 if ord(char) > 0xFFFF else 1
-
-    mapping[index] = qindex
-
-    return mapping
+    offset = bisect_left(surrogates.utf16, q_idx)
+    return q_idx - offset
 
 
 class CursorPosition(NamedTuple):
@@ -93,13 +111,13 @@ class Cursor:
 
     def get_index(self) -> int:
         """The current index (characters from the start) of the cursor."""
-        return convert_utf16_index_to_python(self._parent.content, self.qindex)
+        return convert_utf16_index_to_python(self.qindex, get_surrogate_positions(self._parent.content))
 
     def current_block(self) -> QTextBlock:
         return self._get().block()
 
     def move_to(self, index: int, *, select_between: bool = False) -> None:
-        q = convert_string_index_to_utf16(self._parent.content, index)
+        q = convert_string_index_to_utf16(index, get_surrogate_positions(self._parent.content))
         self._move_to_qindex(q, select_between=select_between)
 
     def _move_to_qindex(self, qindex: int, *, select_between: bool = False) -> None:
@@ -114,9 +132,12 @@ class Cursor:
 
     def select(self, start: int, end: int) -> None:
         """Force selection of the range [start, end)."""
-        qindex_map = build_qindex_map(self._parent.content[:end])
-        self._move_to_qindex(qindex_map[end - 1])
-        self._move_to_qindex(qindex_map[start], select_between=True)
+        surrogates = get_surrogate_positions(self._parent.content[:end])
+
+        q_end = convert_string_index_to_utf16(end, surrogates)
+        q_start = convert_string_index_to_utf16(start, surrogates)
+        self._move_to_qindex(q_end)
+        self._move_to_qindex(q_start, select_between=True)
         self._parent.align_screen_view_to_block(self.current_block())
 
     @property
@@ -125,9 +146,10 @@ class Cursor:
             q1, q2 = _cur.selectionStart(), _cur.selectionEnd()
 
             # because qindices are always larger than their index counterparts, [:q2] is guaranteed to be sufficient
-            qindex_map = build_qindex_map(self._parent.content[:q2])
-            i1 = next(i for i, q in qindex_map.items() if q >= q1)
-            i2 = next(i for i, q in qindex_map.items() if q >= q2) + 1  # to account for exclusive RHS
+            surrogates = get_surrogate_positions(self._parent.content[:q2])
+
+            i1 = convert_utf16_index_to_python(q1, surrogates)
+            i2 = convert_utf16_index_to_python(q2, surrogates)
 
             return i1, i2
 
