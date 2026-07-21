@@ -174,6 +174,7 @@ class TextArea(QTextEdit):
 
         def _remove_highlight() -> None:
             self._highlighted_block = None
+            self._highlight_animation = None
 
         self._highlight_animation = AnimatedAction(
             initial_value=0x30,
@@ -187,13 +188,19 @@ class TextArea(QTextEdit):
 
     @override
     def paintEvent(self, event: QPaintEvent) -> None:
-        if self._highlighted_block:
-            assert self._highlight_animation is not None
-            color = self._highlight_color.with_alpha(self._highlight_animation.value)
+        if self._highlighted_block and self._highlight_animation:
+            if self._highlighted_block.isValid():
+                color = self._highlight_color.with_alpha(self._highlight_animation.value)
 
-            bbox = self._block_bbox(self._highlighted_block)
-            y = bbox.top() - self.verticalScrollBar().value()
-            fill_rect(self.viewport(), x=0, y=y, width=self.viewport().width(), height=bbox.height(), color=color)
+                bbox = self._block_bbox(self._highlighted_block)
+                y = bbox.top() - self.verticalScrollBar().value()
+                fill_rect(self.viewport(), x=0, y=y, width=self.viewport().width(), height=bbox.height(), color=color)
+            else:
+                # the block doesn't exist anymore, so force-stop the animation
+                if f := self._highlight_animation.on_finish:
+                    f()
+
+                self._highlight_animation = None
 
         super().paintEvent(event)
 
