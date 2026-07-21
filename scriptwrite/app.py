@@ -1,11 +1,14 @@
 from collections.abc import Iterable
+from functools import partial
 from pathlib import Path
 import re
 import sys
 import textwrap
-from typing import cast
+from typing import cast, Literal
 
 from scriptwrite.utils import discard, find_text, make_needle
+from scriptwrite.widgets.actions import Shortcut
+from scriptwrite.widgets.display import set_font_size
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -55,7 +58,15 @@ class LiveEditor(QMainWindow):
         self._find_toolbar = FindToolBar(self, discard(self._find), self._replace).bind()
 
         self._menubar = self._init_menu()
+        self._other_shortcuts = self._init_shortcuts()
         self._status_bar = self._init_status_bar()
+
+        # font sizes
+        self._font_sizes: dict[Literal["default", "current"], int] = {
+            "default": config.font_size,
+            "current": config.font_size,
+        }
+        self._change_font_size()
 
         self._filepath: Path | None = None
         if path:
@@ -116,6 +127,14 @@ class LiveEditor(QMainWindow):
         }
 
         return MenuBar(self, menus=menus)
+
+    def _init_shortcuts(self) -> list[Shortcut]:
+        return [
+            # font size changes
+            Shortcut("Ctrl++", self, callback=partial(self._change_font_size, direction=1)),
+            Shortcut("Ctrl+-", self, callback=partial(self._change_font_size, direction=-1)),
+            Shortcut("Ctrl+0", self, callback=partial(self._change_font_size, direction=0)),
+        ]
 
     def _init_status_bar(self) -> StatusBar:
         bar = StatusBar(self)
@@ -317,6 +336,15 @@ class LiveEditor(QMainWindow):
 
     def _show_about(self) -> None:
         QMessageBox.information(None, "About scriptwrite", "scriptwrite v0.1.0\nⓒ 2026 lilellia")
+
+    def _change_font_size(self, direction: Literal[-1, 0, 1] = 0) -> None:
+        if direction == 0:
+            self._font_sizes["current"] = self._font_sizes["default"]
+        else:
+            self._font_sizes["current"] += direction
+
+        for w in (self._editor, self._preview):
+            set_font_size(w, self._font_sizes["current"])
 
     def run(self) -> None:
         super().showMaximized()

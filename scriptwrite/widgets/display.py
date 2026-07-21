@@ -3,6 +3,7 @@ from weakref import ref
 
 from PySide6.QtCore import QObject, QRectF
 from PySide6.QtGui import QColor, QPaintDevice, QPainter, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtWidgets import QWidget
 
 from scriptwrite.types import QtValueType
 from scriptwrite.widgets.descriptors import QtProperty
@@ -206,3 +207,9 @@ def fill_rect(surface: QPaintDevice, x: float, y: float, width: float, height: f
     painter = QPainter(surface)
     painter.fillRect(QRectF(x, y, width, height), color._proxy)
     painter.end()
+
+
+def set_font_size(widget: QWidget, size: int) -> None:
+    font = widget.font()
+    font.setPointSize(size)
+    widget.setFont(font)

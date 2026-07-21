@@ -10,6 +10,7 @@ from scriptwrite.log import logger
 @dataclass(slots=True)
 class Config:
     mode: Literal["light", "dark", "system"] = "system"
+    font_size: int = 12
 
     @classmethod
     def load(cls) -> Self:
@@ -22,4 +23,4 @@ class Config:
 
         with open(path, "r", encoding="utf-8") as f:
             kwargs = YAML(typ="safe").load(f)
-            return cls(kwargs)
+            return cls(**kwargs)
