@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+import faulthandler
 import os
 from os import PathLike
 from pathlib import Path
@@ -10,6 +11,7 @@ from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Qt
 from PySide6.QtGui import QPalette, QStyleHints
 from PySide6.QtWidgets import QApplication, QStyle, QStyleFactory
 
+from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
 from scriptwrite.types import F
 from scriptwrite.widgets.signals import QtSignalProperty
@@ -17,6 +19,9 @@ from scriptwrite.widgets.signals import QtSignalProperty
 
 class Application(QApplication):
     def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
+        self._crashfile = open(APP_DIRS.logs / "crash.log", "w+")
+        faulthandler.enable(file=self._crashfile, all_threads=True, c_stack=True)
+
         if sys.platform.startswith("linux"):
             self._force_ime()
             self._extend_qt6_plugin_paths()

@@ -213,25 +213,25 @@ class Logger:
     def remove(self, handler: Handler) -> None:
         self.handlers = {i: h for i, h in self.handlers.items() if h != handler}
 
-    def debug(self, message: str, **extra: Any) -> None:
+    def debug(self, message: Any, **extra: Any) -> None:
         self.emit(Level.DEBUG, message, **extra)
 
-    def info(self, message: str, **extra: Any) -> None:
+    def info(self, message: Any, **extra: Any) -> None:
         self.emit(Level.INFO, message, **extra)
 
-    def success(self, message: str, **extra: Any) -> None:
+    def success(self, message: Any, **extra: Any) -> None:
         self.emit(Level.SUCCESS, message, **extra)
 
-    def warning(self, message: str, **extra: Any) -> None:
+    def warning(self, message: Any, **extra: Any) -> None:
         self.emit(Level.WARNING, message, **extra)
 
-    def error(self, message: str, **extra: Any) -> None:
+    def error(self, message: Any, **extra: Any) -> None:
         self.emit(Level.ERROR, message, **extra)
 
-    def critical(self, message: str, **extra: Any) -> None:
+    def critical(self, message: Any, **extra: Any) -> None:
         self.emit(Level.CRITICAL, message, **extra)
 
-    def fatal(self, message: str, **extra: Any) -> None:
+    def fatal(self, message: Any, **extra: Any) -> None:
         self.emit(Level.FATAL, message, **extra)
         sys.exit(1)
 
@@ -239,7 +239,7 @@ class Logger:
     # 0 = Logger.emit
     # 1 = Logger.info (example)
     # 2 = the function that called Logger.info
-    def emit(self, level: Level, message: str, *, stacklevel: int = 2, **extra: Any) -> None:
+    def emit(self, level: Level, message: Any, *, stacklevel: int = 2, **extra: Any) -> None:
         if level < self.level:
             return
 
@@ -248,7 +248,7 @@ class Logger:
             level=level,
             name=self.name,
             time=datetime.now().astimezone(),
-            message=message,
+            message=str(message),
             filename=caller.filename,
             function=caller.function,
             line=caller.lineno,
