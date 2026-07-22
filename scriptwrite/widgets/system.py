@@ -5,7 +5,7 @@ import os
 from os import PathLike
 from pathlib import Path
 import sys
-from typing import Any, assert_never, Literal
+from typing import Any, assert_never, IO, Literal
 
 from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Qt
 from PySide6.QtGui import QPalette, QStyleHints
@@ -74,7 +74,7 @@ class Application(QApplication):
             case _:
                 assert_never(value)
 
-    def _enable_crash_handler(self) -> None:
+    def _enable_crash_handler(self) -> IO[str]:
         f = open(APP_DIRS.logs / "crash.log", "w+")
 
         if sys.version_info >= (3, 14):

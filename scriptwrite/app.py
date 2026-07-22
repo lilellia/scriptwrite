@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from contextlib import suppress
 from functools import partial
 from pathlib import Path
 import re
@@ -74,9 +75,12 @@ class LiveEditor(QMainWindow):
         if path:
             self._open_file(path)
 
+        self._load_autosave()
+
         self._dirty: bool = False
 
         self._render_timer = Timer(duration=200, callback=self._compile)
+        self._autosave_timer = Timer(duration=10000, callback=self._autosave)
 
     @property
     def title(self) -> str:
@@ -240,6 +244,10 @@ class LiveEditor(QMainWindow):
             self._status_bar.ephemeral(f"Saved to {self._filepath}")
         except Exception as e:
             self._status_bar.ephemeral(f"Save failed: {e}")
+        else:
+            # remove autosave file
+            with suppress(OSError):
+                self._get_autosave_dest().unlink()
 
         self.dirty = False
 
@@ -248,6 +256,36 @@ class LiveEditor(QMainWindow):
             self._save_file(save_as=True)
         else:
             self._save_file(save_as=True, directory=self._filepath.parent)
+
+    def _get_autosave_dest(self) -> Path:
+        filepath = self._filepath.name if self._filepath else "untitled1.md"
+        return fs.APP_DIRS.autosaves / filepath
+
+    def _autosave(self) -> None:
+        """Perform an autosave for the current file."""
+        if not self._dirty:
+            return
+
+        try:
+            fs.atomic_write(self._editor.content, self._get_autosave_dest())
+            self._status_bar.ephemeral("Autosave complete", duration=1000)
+        except Exception as e:
+            self._status_bar.ephemeral(f"Autosave failed: {e}")
+
+    def _load_autosave(self) -> None:
+
+        if not (autosaves := list(fs.APP_DIRS.autosaves.iterdir())):
+            return
+
+        buttons = QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Discard
+        message = f"The editor appears to have closed unexpectedly. Would you like to reload autosave: {autosaves[0]}?"
+        match QMessageBox.warning(self, "Detected Autosaves", message, buttons):
+            case QMessageBox.StandardButton.Open:
+                self._open_file(autosaves[0])
+                self._filepath = None
+
+            case QMessageBox.StandardButton.Discard:
+                pass
 
     def _quit(self) -> None:
         """Exit the application."""
@@ -309,6 +347,7 @@ class LiveEditor(QMainWindow):
         """Called when the editor pane's content changes. Registers the update for the preview pane."""
         self.dirty = True
         self._render_timer.start()  # debounce
+        self._autosave_timer.start()
 
     def _compile(self) -> None:
         """Update the content of the preview pane."""
@@ -332,6 +371,7 @@ class LiveEditor(QMainWindow):
 
             ++Lead a line with two plus signs to mark it as a stage direction.
 
+            // Use two slashes to mark a comment. This shows in the preview, but won't be exported by default.
         """)
         QMessageBox.information(None, "Help", message)
 
