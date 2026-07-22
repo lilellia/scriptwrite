@@ -19,8 +19,7 @@ from scriptwrite.widgets.signals import QtSignalProperty
 
 class Application(QApplication):
     def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
-        self._crashfile = open(APP_DIRS.logs / "crash.log", "w+")
-        faulthandler.enable(file=self._crashfile, all_threads=True, c_stack=True)
+        self._crashfile = self._enable_crash_handler()
 
         if sys.platform.startswith("linux"):
             self._force_ime()
@@ -74,6 +73,17 @@ class Application(QApplication):
 
             case _:
                 assert_never(value)
+
+    def _enable_crash_handler(self) -> None:
+        f = open(APP_DIRS.logs / "crash.log", "w+")
+
+        if sys.version_info >= (3, 14):
+            # option to dump the C stack trace was added in 3.14
+            faulthandler.enable(file=f, all_threads=True, c_stack=True)
+        else:
+            faulthandler.enable(file=f, all_threads=True)
+
+        return f
 
     @staticmethod
     def _force_ime() -> None:

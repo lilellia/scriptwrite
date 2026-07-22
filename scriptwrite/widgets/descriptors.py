@@ -18,7 +18,7 @@ def default_set_name(get_name: str) -> str:
 
 def deep_getattr(obj: Any, dotted_name: str) -> Any:
     components = dotted_name.split(".")
-    return reduce(lambda acc, attr: getattr(acc, attr), components, initial=obj)
+    return reduce(lambda acc, attr: getattr(acc, attr), components, obj)
 
 
 def _identity(x: T) -> T:

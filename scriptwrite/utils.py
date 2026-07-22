@@ -7,7 +7,8 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
     C = TypeVar("C", bound=DataclassInstance)
-
+else:
+    C = TypeVar("C")
 
 P = ParamSpec("P")
 R = TypeVar("R")
