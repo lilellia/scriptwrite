@@ -1,3 +1,3 @@
-from . import html
+from . import block, html
 
-__all__ = ["html"]
+__all__ = ["block", "html"]

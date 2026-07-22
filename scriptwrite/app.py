@@ -6,6 +6,7 @@ import sys
 import textwrap
 from typing import cast, Literal
 
+from scriptwrite.log import logger
 from scriptwrite.utils import discard, find_text, make_needle
 from scriptwrite.widgets.actions import Shortcut
 from scriptwrite.widgets.display import set_font_size
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import (
     QSplitter,
 )
 
-from scriptwrite import fs, parser, renderers
+from scriptwrite import fs, parser
 from scriptwrite.config import Config
 from scriptwrite.features import EditorPane, FindToolBar, PreviewPane
 from scriptwrite.types import W
@@ -35,6 +36,7 @@ from scriptwrite.widgets import (
 )
 
 config = Config.load()
+logger.info(f"Loaded {config=}")
 
 _app = Application(["scriptwrite"], mode=config.mode)
 
@@ -311,8 +313,7 @@ class LiveEditor(QMainWindow):
     def _compile(self) -> None:
         """Update the content of the preview pane."""
         script = parser.parse_text(self._editor.content)
-        content = renderers.html.render_html(script, inject_css=False)
-        self._preview.html = content
+        self._preview.write(script)
         self._scroll_sync(force=True)
 
         self._status_bar["word-counts"].content = f"[Word Counts] {script.word_count_display}"
@@ -343,8 +344,11 @@ class LiveEditor(QMainWindow):
         else:
             self._font_sizes["current"] += direction
 
-        for w in (self._editor, self._preview):
-            set_font_size(w, self._font_sizes["current"])
+        f = self._font_sizes["current"]
+
+        set_font_size(self._editor, f)
+        set_font_size(self._preview, f)
+        self._preview.update_block_formatting()
 
     def run(self) -> None:
         super().showMaximized()

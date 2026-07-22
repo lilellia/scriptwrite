@@ -123,9 +123,14 @@ class TextStyle(QTextCharFormat):
         if bg := kwargs.get("bg"):
             self.bg = bg
 
-        self.bold = kwargs.get("bold", False)
-        self.italic = kwargs.get("italic", False)
-        self.underline = kwargs.get("underline", False)
+        if (bold := kwargs.get("bold")) is not None:
+            self.bold = bold
+
+        if (italic := kwargs.get("italic")) is not None:
+            self.italic = italic
+
+        if (underline := kwargs.get("underline")) is not None:
+            self.underline = underline
 
     def as_dict(self) -> TextStyleParams:
         return TextStyleParams(fg=self.fg, bg=self.bg, bold=self.bold, italic=self.italic, underline=self.underline)

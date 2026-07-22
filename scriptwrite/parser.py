@@ -177,6 +177,10 @@ def regex_partition(text: str, pattern: str | re.Pattern[str]) -> list[str]:
 
 
 def parse_text(content: str) -> Script:
+    # remove actual commented content
+    content = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
+    content = content.rstrip("\u000a\u0000")
+
     header_raw, body, offset = split_off_header(content)
     header = parse_header(header_raw)
 

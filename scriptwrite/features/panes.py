@@ -1,20 +1,20 @@
 from enum import IntEnum
-import re
 import sys
-from typing import Any, cast
+from typing import Any, assert_never, cast, TypedDict
 
 from scriptwrite import renderers
 from scriptwrite.log import logger
+from scriptwrite.parser import Character, LineType, Script
 from scriptwrite.widgets import qre
 from scriptwrite.widgets.display import SyntaxHighlighter, TextStyle
-from scriptwrite.widgets.text import anchors_of, TextArea
+from scriptwrite.widgets.text import BlockFormat, TextArea, UserData
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QTextBlock, QTextBlockUserData
+from PySide6.QtGui import QFontMetricsF, QTextBlock
 
 
 class EditorPane(TextArea):
@@ -101,10 +101,10 @@ class Highlighter(SyntaxHighlighter):
         self.highlight_color_attribute(text)
 
 
-class SourceLineData(QTextBlockUserData):
-    def __init__(self, source_line: int) -> None:
-        super().__init__()
-        self.source_line = source_line
+class LineData(TypedDict, total=False):
+    source_line: int
+    type: LineType
+    character: Character | None
 
 
 class PreviewPane(TextArea):
@@ -114,43 +114,84 @@ class PreviewPane(TextArea):
         self.css = renderers.html.DEFAULT_CSS
         self._source_line_map: dict[int, QTextBlock] = {}
 
-    @override
-    def _set_html(self, s: str) -> None:
-        super()._set_html(s)
+    def write(self, script: Script) -> None:
+        renderers.block.render_blocks(script, self.doc)
+        logger.debug("blocks written")
+        self.update_source_line_map()
+        self.update_block_formatting()
 
-        # and now inject source line numbers
+    def update_source_line_map(self) -> None:
         self._source_line_map.clear()
-        pattern = re.compile(r"^data-source-line_eq_(\d+)$")
         for block in self.blocks():
-            for fragment in type(self).fragments_of(block):
-                for name in anchors_of(fragment):
-                    if match := pattern.match(name):
-                        source_line = int(match.group(1), 10)
-                        self._source_line_map[source_line] = block
-                        block.setUserData(SourceLineData(source_line))
+            data = self.get_block_data(block)
+
+            if (source := data.get("source_line")) is not None:
+                self._source_line_map[source] = block
+
+    def update_block_formatting(self) -> None:
+        for block in self.blocks():
+            data = self.get_block_data(block)
+            fmt = BlockFormat(block)
+
+            base_font_size = super().font().pointSizeF()
+            ch = QFontMetricsF(super().font()).horizontalAdvance("0")
+
+            match data.get("type"):
+                case None:
+                    match fmt.heading:
+                        case 1:
+                            fmt.font_size = base_font_size * 2
+                        case 2:
+                            fmt.font_size = base_font_size * 1.5
+
+                case LineType.LISTENER:
+                    fmt.margin_left = 12 * ch
+                    fmt.margin_right = 12 * ch
+
+                case LineType.CUE:
+                    fmt.margin_left = 6 * ch
+                    fmt.margin_right = 6 * ch
+
+                case LineType.COMMENT:
+                    fmt.margin_left = 20 * ch
+                    fmt.margin_right = 20 * ch
+                    fmt.font_size = base_font_size * 0.8
+
+                case LineType.SPOKEN:
+                    fmt.margin_left = 0
+                    fmt.margin_right = 0
+
+                case _t:
+                    assert_never(_t)
+
+    @staticmethod
+    def get_block_data(block: QTextBlock) -> LineData:
+        if (data := block.userData()) and isinstance(data, UserData):
+            return LineData(**data.kwargs)
+
+        return LineData()
 
     def get_current_source_line(self) -> int | None:
         """Return the line number of the source that points to the line containing the cursor."""
         line, _ = self._cursor.position
 
         block = cast(QTextBlock, self.get_block_at_line(line))
+        data = self.get_block_data(block)
 
-        if (data := block.userData()) is None:
-            logger.debug(f"Scroll sync failure: preview line {block.text()!r} does not contain reference")
-            return None
-
-        if not isinstance(data, SourceLineData):
-            logger.debug(f"Scroll sync failure: preview line {block.text()!r} does not contain source line data")
-            return None
-
-        return data.source_line
+        return data.get("source_line")
 
     def scroll_to_source_line(self, line: int) -> None:
         target = self._source_line_map.get(line, None)
 
         if target is None and (valid := [x for x in self._source_line_map.keys() if x <= line]):
-            # scan backwards to find the closet line before this one
+            # scan backwards to find the closest line before this one
             target = self._source_line_map[max(valid)]
+
+        if target is None:
+            # try grabbing the first line after this one
+            target = next(block for key, block in self._source_line_map.items() if key >= line)
 
         if target:
             self.scroll_to_block(target, align=True)
+        else:
+            logger.warning(f"Could not scroll to source line {line}. No valid target found.")
