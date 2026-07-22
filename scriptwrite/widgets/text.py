@@ -160,6 +160,15 @@ class TextArea(QTextEdit):
             super().blockSignals(False)
 
     @contextmanager
+    def suppress_updates(self) -> Iterator[None]:
+        viewport = super().viewport()
+        try:
+            viewport.setUpdatesEnabled(False)
+            yield
+        finally:
+            viewport.setUpdatesEnabled(True)
+
+    @contextmanager
     @staticmethod
     def suppress_edits(document: QTextDocument) -> Iterator[None]:
         old = document.isUndoRedoEnabled()

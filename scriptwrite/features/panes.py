@@ -129,40 +129,41 @@ class PreviewPane(TextArea):
                 self._source_line_map[source] = block
 
     def update_block_formatting(self) -> None:
-        for block in self.blocks():
-            data = self.get_block_data(block)
-            fmt = BlockFormat(block)
+        base_font_size = super().font().pointSizeF()
+        ch = QFontMetricsF(super().font()).horizontalAdvance("0")
 
-            base_font_size = super().font().pointSizeF()
-            ch = QFontMetricsF(super().font()).horizontalAdvance("0")
+        with self.suppress_signals(), self.suppress_updates(), self.transaction():
+            for block in self.blocks():
+                data = self.get_block_data(block)
+                fmt = BlockFormat(block)
 
-            match data.get("type"):
-                case None:
-                    match fmt.heading:
-                        case 1:
-                            fmt.font_size = base_font_size * 2
-                        case 2:
-                            fmt.font_size = base_font_size * 1.5
+                match data.get("type"):
+                    case None:
+                        match fmt.heading:
+                            case 1:
+                                fmt.font_size = base_font_size * 2
+                            case 2:
+                                fmt.font_size = base_font_size * 1.5
 
-                case LineType.LISTENER:
-                    fmt.margin_left = 12 * ch
-                    fmt.margin_right = 12 * ch
+                    case LineType.LISTENER:
+                        fmt.margin_left = 12 * ch
+                        fmt.margin_right = 12 * ch
 
-                case LineType.CUE:
-                    fmt.margin_left = 6 * ch
-                    fmt.margin_right = 6 * ch
+                    case LineType.CUE:
+                        fmt.margin_left = 6 * ch
+                        fmt.margin_right = 6 * ch
 
-                case LineType.COMMENT:
-                    fmt.margin_left = 20 * ch
-                    fmt.margin_right = 20 * ch
-                    fmt.font_size = base_font_size * 0.8
+                    case LineType.COMMENT:
+                        fmt.margin_left = 20 * ch
+                        fmt.margin_right = 20 * ch
+                        fmt.font_size = base_font_size * 0.8
 
-                case LineType.SPOKEN:
-                    fmt.margin_left = 0
-                    fmt.margin_right = 0
+                    case LineType.SPOKEN:
+                        fmt.margin_left = 0
+                        fmt.margin_right = 0
 
-                case _t:
-                    assert_never(_t)
+                    case _t:
+                        assert_never(_t)
 
     @staticmethod
     def get_block_data(block: QTextBlock) -> LineData:
