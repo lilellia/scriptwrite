@@ -115,7 +115,9 @@ class PreviewPane(TextArea):
         self._source_line_map: dict[int, QTextBlock] = {}
 
     def write(self, script: Script) -> None:
-        renderers.block.render_blocks(script, self.doc)
+        with self.transaction():
+            self.doc.clear()
+            renderers.block.render_blocks(script, self.doc)
         logger.debug("blocks written")
         self.update_source_line_map()
         self.update_block_formatting()
