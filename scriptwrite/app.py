@@ -126,6 +126,13 @@ class LiveEditor(QMainWindow):
                 MenuItemData("---", None),
                 MenuItemData("&Find/Replace", self._find_toolbar.toggle, shortcut=("Ctrl+F", "Ctrl+H")),
             ],
+            "&Tools": [
+                MenuItemData(
+                    "&Insert Header Template",
+                    self._insert_header,
+                    shortcut=("Ctrl+Shift+H"),
+                )
+            ],
             "&Help": [
                 MenuItemData("&Help", self._show_help, shortcut="Ctrl+?"),
                 MenuItemData("&About", self._show_about),
@@ -227,6 +234,11 @@ class LiveEditor(QMainWindow):
             case QMessageBox.StandardButton.Discard:
                 # changes discarded, carry on
                 self._status_bar.ephemeral("Unsaved changes discarded")
+
+                # we'll also discard the autosave file
+                with suppress(OSError):
+                    self._get_autosave_dest().unlink()
+
                 return True
 
         return False
@@ -356,6 +368,33 @@ class LiveEditor(QMainWindow):
         self._scroll_sync(force=True)
 
         self._status_bar["word-counts"].content = f"[Word Counts] {script.word_count_display}"
+
+    def _insert_header(self) -> None:
+        header_template = textwrap.dedent("""
+        ---
+        title: script title
+        author: script author
+        summary: script description
+        audience:
+          - A4A
+        taglist:
+          - tag1
+          - tag2
+        characters:
+          - name: Alice
+            aliases:
+              - A
+            colour: ff6ae6
+            summary: ...
+          - name: Bob
+            aliases:
+              - B
+            colour: 139ad9
+            summary: ...
+        published:
+        ---
+        """)
+        self._editor.content = f"{header_template}\n{self._editor.content}"
 
     def _show_help(self) -> None:
         message = textwrap.dedent("""
