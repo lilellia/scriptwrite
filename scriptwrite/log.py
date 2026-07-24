@@ -19,7 +19,11 @@ from typing_extensions import override
 
 from scriptwrite.fs import APP_DIRS
 
-DEFAULT_LOG_FORMAT = "{time:%Y-%m-%dT%H:%M:%S.%f %:z} | {level.name:<8} | {filename}:{line} | {message}"
+if sys.version_info >= (3, 12):
+    DEFAULT_LOG_FORMAT = "{time:%Y-%m-%dT%H:%M:%S.%f%:z} | {level.name:<8} | {filename}:{line} | {message}"
+else:
+    # %:z is 3.12+
+    DEFAULT_LOG_FORMAT = "{time:%Y-%m-%dT%H:%M:%S.%f%z} | {level.name:<8} | {filename}:{line} | {message}"
 
 
 class FilterFunc(Protocol):
@@ -146,12 +150,12 @@ class FileHandler(Handler):
         data = {**asdict(record), **extra}
 
         # serialize the fields that aren't natively serializable
-        data["time"] = format(data["time"], "%Y-%m-%dT%H:%M:%S.%f%:z")
+        data["time"] = data["time"].isoformat()
         data["level"] = data["level"].name
 
         output = json.dumps(data)
 
-        with open(self.path, "a") as f:
+        with open(self.path, "a", encoding="utf-8") as f:
             f.write(output + "\n")
             f.flush()
 
