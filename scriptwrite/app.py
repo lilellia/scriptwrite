@@ -358,12 +358,19 @@ class LiveEditor(QMainWindow):
     def _on_change(self) -> None:
         """Called when the editor pane's content changes. Registers the update for the preview pane."""
         self.dirty = True
+        self._editor.remove_syntax_errors()
         self._render_timer.start()  # debounce
         self._autosave_timer.start()
 
     def _compile(self) -> None:
         """Update the content of the preview pane."""
-        script = parser.parse_text(self._editor.content)
+        try:
+            script = parser.parse_text(self._editor.content)
+        except parser.YAMLParseError as err:
+            self._status_bar.ephemeral(err.message)
+            self._editor.show_syntax_error(err.message, err.line, col=None)
+            return
+
         self._preview.write(script)
         self._scroll_sync(force=True)
 

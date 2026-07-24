@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from bisect import bisect_left
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast, NamedTuple, TYPE_CHECKING
 
-from PySide6.QtGui import QTextBlock, QTextCursor
+from PySide6.QtGui import QColor, QTextBlock, QTextCursor
+from PySide6.QtWidgets import QTextEdit, QToolTip
 
 if TYPE_CHECKING:
     # TextArea holds a reference to Cursor, so we end up in an import cycle without the TYPE_CHECKING guard
@@ -169,3 +171,33 @@ class Cursor:
         return CursorContext(
             index=self.get_index(), selected_range=self.selected_range, selected_text=self.selected_text
         )
+
+    def remove_extra_selections(self) -> None:
+        self._parent.setExtraSelections([])
+
+    def highlight_error(self, error: str, line: int, column: int | None = None) -> None:
+        if not (block := self._parent.doc.findBlockByLineNumber(line - 1)).isValid():
+            return
+
+        cur = QTextCursor(block)
+
+        if column is None:
+            cur.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            cur.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+        else:
+            # select the next character
+            cur.setPosition(block.position() + column)
+            cur.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+
+        sel = QTextEdit.ExtraSelection()
+        sel.cursor = cur
+        sel.format.setBackground(QColor("#50FF0000"))
+
+        self._parent.setExtraSelections([sel])
+        self.show_tooltip(sel, error)
+
+    def show_tooltip(self, selection: QTextEdit.ExtraSelection, message: str) -> None:
+        rect = self._parent.cursorRect(selection.cursor)
+        pos = self._parent.viewport().mapToGlobal(rect.bottomLeft())
+
+        QToolTip.showText(pos, message, self._parent)

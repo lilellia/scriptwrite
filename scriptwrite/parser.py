@@ -9,10 +9,21 @@ from typing import Any, cast, NamedTuple
 
 from niji.colors import parse_color_input, RGBColor
 import ruamel.yaml
+import ruamel.yaml.scanner
 
 from scriptwrite.utils import load_dataclass
 
 RUN_SPLIT_PATTERN = re.compile(r"\(.*?\)|\*.*?\*|==.*?==")
+
+
+class YAMLParseError(Exception):
+    """An exception raised when parsing invalid YAML data. Holds the 1-indexed line/col where the error occurred."""
+
+    def __init__(self, message: str, line: int, col: int) -> None:
+        super().__init__(message, line, col)
+        self.message = message
+        self.line = line
+        self.col = col
 
 
 class Document(NamedTuple):
@@ -126,7 +137,20 @@ def split_off_header(text: str) -> Document:
 
 
 def parse_header(text: str) -> dict[str, Any]:
-    return cast(dict[str, Any], ruamel.yaml.YAML(typ="safe").load(text))
+    try:
+        data = ruamel.yaml.YAML(typ="safe").load(text)
+    except ruamel.yaml.scanner.ScannerError as err:
+        mark = err.problem_mark or err.context_mark
+
+        # for some reason, ruamel exposes this as a 0-indexed value
+        line = (mark.line + 1) if mark else 1
+        col = (mark.column + 1) if mark else 1
+
+        details = err.problem or err.context or "Invalid YAML syntax"
+        message = f"[L{line}C{col}] {details}"
+        raise YAMLParseError(message, line=line, col=col)
+    else:
+        return cast(dict[str, Any], data)
 
 
 def identify_run(run_text: str) -> TextRun:

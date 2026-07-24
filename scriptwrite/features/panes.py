@@ -2,7 +2,7 @@ from enum import IntEnum
 import sys
 from typing import Any, assert_never, cast, TypedDict
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QToolTip
 
 from scriptwrite import renderers
 from scriptwrite.log import logger
@@ -24,6 +24,13 @@ class EditorPane(TextArea):
         super().__init__(*args, **kwargs)
         super().setAcceptRichText(False)
         self._highlighter = Highlighter(self.doc)
+
+    def show_syntax_error(self, message: str, line: int, col: int | None) -> None:
+        self._cursor.highlight_error(message, line, col)
+
+    def remove_syntax_errors(self) -> None:
+        self._cursor.remove_extra_selections()
+        QToolTip.hideText()
 
 
 class _BlockState(IntEnum):
@@ -198,7 +205,7 @@ class PreviewPane(TextArea):
 
         if target is None:
             # try grabbing the first line after this one
-            target = next(block for key, block in self._source_line_map.items() if key >= line)
+            target = next((block for key, block in self._source_line_map.items() if key >= line), None)
 
         if target:
             self.scroll_to_block(target, align=True)
