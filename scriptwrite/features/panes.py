@@ -1,5 +1,7 @@
+import ast
 from enum import IntEnum
 import sys
+import tomllib
 from typing import Any, assert_never, cast, TypedDict
 
 from PySide6.QtWidgets import QToolTip
@@ -7,7 +9,7 @@ from PySide6.QtWidgets import QToolTip
 from scriptwrite import renderers
 from scriptwrite.log import logger
 from scriptwrite.parser import Character, LineType, Script
-from scriptwrite.widgets import qre
+from scriptwrite.widgets import color_utils, qre
 from scriptwrite.widgets.display import Color, SyntaxHighlighter, TextStyle
 from scriptwrite.widgets.text import BlockFormat, TextArea, UserData
 
@@ -63,9 +65,15 @@ class Highlighter(SyntaxHighlighter):
             self.block_state = _BlockState.TOML_HEADER_CLOSED
 
     def highlight_color_attribute(self, text: str) -> None:
-        if match := qre.search(r"\bcolou?r\s*=\s*\"(.*?)\"", text):
-            style = TextStyle(fg=f"{match.group(1)}")
-            self.apply(style, *match.span(1))
+        if match := qre.search(r"\bcolou?r\s*=\s*(.*?)$", text):
+            value = ast.literal_eval(match.group(1))
+            try:
+                fg = color_utils.parse_color_input(value)
+            except ValueError:
+                pass
+            else:
+                style = TextStyle(fg=fg)
+                self.apply(style, *match.span(1))
 
     def highlight_html_comment(self, text: str) -> None:
         style = TextStyle(fg="#FFFFFF").dimmed(0.15)

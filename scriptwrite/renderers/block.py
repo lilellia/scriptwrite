@@ -23,7 +23,7 @@ def render_dialogue(line: Line, cursor: QTextCursor) -> None:
 
     with TextBlock(cursor, **metadata) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=8)
-        color = Color.from_rgb(*cast(Character, line.speaker).colour)
+        color = cast(Character, line.speaker).colour
 
         for run in line.text_runs:
             match run.type:

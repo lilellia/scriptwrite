@@ -1,9 +1,8 @@
 from io import StringIO
 from typing import Any, assert_never
 
-from niji.colors import RGBColor
-
 from scriptwrite.parser import Line, LineType, Script, TextRun, TextRunType
+from scriptwrite.widgets.display import Color
 
 DEFAULT_CSS = """
 .dialogue {
@@ -41,10 +40,6 @@ DEFAULT_CSS = """
 """
 
 
-def as_hex(rgb: RGBColor) -> str:
-    return f"#{rgb.red:02X}{rgb.green:02X}{rgb.blue:02X}"
-
-
 def render_header(script: Script, *, inject_css: bool = True) -> str:
     return f"""\
 <!DOCTYPE html>
@@ -76,7 +71,7 @@ def render_data_attrs(**attrs: Any) -> str:
 
 
 def render_line(
-    line: Line, *, clsname: str, prefix: str = "", suffix: str = "", color: RGBColor | None = None, **attrs: str
+    line: Line, *, clsname: str, prefix: str = "", suffix: str = "", color: Color | None = None, **attrs: str
 ) -> str:
     buffer = StringIO()
 
@@ -105,7 +100,7 @@ def render_line(
 
     content = buffer.getvalue().replace("\\^\\_\\^", "^_^")
     data_attrs = render_data_attrs(source_line=line.index, **attrs)
-    style = f'style="color: {as_hex(color)}"' if color else ""
+    style = f'style="color: {color.as_hex()}"' if color else ""
     return f"""<p {data_attrs} class="{clsname}" {style}>{content}</p>"""
 
 

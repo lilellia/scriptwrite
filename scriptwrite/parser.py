@@ -8,9 +8,9 @@ import re
 import tomllib
 from typing import Any, cast, NamedTuple
 
-from niji.colors import parse_color_input, RGBColor
-
 from scriptwrite.utils import load_dataclass
+from scriptwrite.widgets.color_utils import parse_color_input
+from scriptwrite.widgets.display import Color
 
 RUN_SPLIT_PATTERN = re.compile(r"\(.*?\)|\*.*?\*|==.*?==")
 
@@ -44,7 +44,7 @@ class LineType(Enum):
 @dataclass(slots=True, frozen=True)
 class Character:
     name: str
-    colour: RGBColor = field(default=RGBColor(0, 0, 0), metadata=dict(converter=parse_color_input))
+    colour: Color = field(default=Color.from_rgb(0, 0, 0), metadata=dict(converter=parse_color_input))
     aliases: tuple[str, ...] = field(default_factory=tuple, metadata=dict(converter=tuple))
     summary: str = ""
 

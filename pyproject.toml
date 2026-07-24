@@ -3,7 +3,6 @@ name = "scriptwrite"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "niji>=0.2.0",
     "pyside6>=6.11.1",
     "typing-extensions>=4.0; python_version < '3.12'",
 ]
