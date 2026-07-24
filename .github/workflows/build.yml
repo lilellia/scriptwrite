@@ -1,0 +1,30 @@
+name: Build Windows Exe
+
+on: workflow_dispatch # Adds a "Run workflow" button in the GitHub UI!
+
+jobs:
+    build:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install dependencies
+              run: pip install pyside6 niji ruamel-yaml typing-extensions nuitka
+
+            - name: Build with Nuitka
+              run: |
+                  python -m nuitka `
+                    --standalone `
+                    --enable-plugin=pyside6 `
+                    --assume-yes-for-downloads `
+                    --output-dir=dist `
+                    scriptwrite.py
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: scriptwrite-v0.1
+                  path: dist/*.exe
