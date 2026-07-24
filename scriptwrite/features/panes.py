@@ -36,36 +36,36 @@ class EditorPane(TextArea):
 class _BlockState(IntEnum):
     UNINITIALIZED = -1
 
-    YAML_HEADER_OPEN = 1
-    YAML_HEADER_CLOSED = 2
+    TOML_HEADER_OPEN = 1
+    TOML_HEADER_CLOSED = 2
 
     HTML_COMMENT_OPEN = 4
 
 
 class Highlighter(SyntaxHighlighter):
-    def highlight_yaml_header(self, text: str) -> None:
+    def highlight_toml_header(self, text: str) -> None:
         style = TextStyle(fg=Color.query("text").dimmed(0.4))
 
         if self.previous_block_state == _BlockState.UNINITIALIZED:
             # first line of the file
-            if text.strip() == "---":
-                self.block_state = _BlockState.YAML_HEADER_OPEN
+            if text.strip() == "+++":
+                self.block_state = _BlockState.TOML_HEADER_OPEN
                 self.apply(style, 0, len(text))
             else:
                 # the first line wasn't a header opening, so there can be no header
-                self.block_state = _BlockState.YAML_HEADER_CLOSED
+                self.block_state = _BlockState.TOML_HEADER_CLOSED
 
-        elif self.previous_block_state & _BlockState.YAML_HEADER_OPEN:
-            self.block_state = _BlockState.YAML_HEADER_CLOSED if text.strip() == "---" else _BlockState.YAML_HEADER_OPEN
+        elif self.previous_block_state & _BlockState.TOML_HEADER_OPEN:
+            self.block_state = _BlockState.TOML_HEADER_CLOSED if text.strip() == "+++" else _BlockState.TOML_HEADER_OPEN
             self.apply(style, 0, len(text))
 
         else:
-            self.block_state = _BlockState.YAML_HEADER_CLOSED
+            self.block_state = _BlockState.TOML_HEADER_CLOSED
 
     def highlight_color_attribute(self, text: str) -> None:
-        if match := qre.search(r"\bcolou?r: \"?([0-9A-Fa-f]{6})\"?", text):
-            style = TextStyle(fg=f"#{match.group(1)}")
-            self.apply(style, *match.span())
+        if match := qre.search(r"\bcolou?r\s*=\s*\"(.*?)\"", text):
+            style = TextStyle(fg=f"{match.group(1)}")
+            self.apply(style, *match.span(1))
 
     def highlight_html_comment(self, text: str) -> None:
         style = TextStyle(fg="#FFFFFF").dimmed(0.15)
@@ -105,7 +105,7 @@ class Highlighter(SyntaxHighlighter):
 
     @override
     def highlightBlock(self, text: str, /) -> None:
-        self.highlight_yaml_header(text)
+        self.highlight_toml_header(text)
         self.highlight_html_comment(text)
         self.highlight_color_attribute(text)
 

@@ -5,25 +5,14 @@ from enum import auto, Enum
 from io import StringIO
 from pathlib import Path
 import re
+import tomllib
 from typing import Any, cast, NamedTuple
 
 from niji.colors import parse_color_input, RGBColor
-import ruamel.yaml
-import ruamel.yaml.scanner
 
 from scriptwrite.utils import load_dataclass
 
 RUN_SPLIT_PATTERN = re.compile(r"\(.*?\)|\*.*?\*|==.*?==")
-
-
-class YAMLParseError(Exception):
-    """An exception raised when parsing invalid YAML data. Holds the 1-indexed line/col where the error occurred."""
-
-    def __init__(self, message: str, line: int, col: int) -> None:
-        super().__init__(message, line, col)
-        self.message = message
-        self.line = line
-        self.col = col
 
 
 class Document(NamedTuple):
@@ -121,13 +110,13 @@ def split_off_header(text: str) -> Document:
 
     lines = text.splitlines()
 
-    if lines[0] != "---":
+    if lines[0] != "+++":
         # document does not begin with a header
         return Document(header="", body=text, offset=0)
 
     buffer = StringIO()
     for i, line in enumerate(lines[1:], start=1):
-        if line == "---":
+        if line == "+++":
             return Document(header=buffer.getvalue(), body="\n".join(lines[i + 1 :]), offset=i + 1)
         else:
             buffer.write(line + "\n")
@@ -138,17 +127,9 @@ def split_off_header(text: str) -> Document:
 
 def parse_header(text: str) -> dict[str, Any]:
     try:
-        data = ruamel.yaml.YAML(typ="safe").load(text)
-    except ruamel.yaml.scanner.ScannerError as err:
-        mark = err.problem_mark or err.context_mark
-
-        # for some reason, ruamel exposes this as a 0-indexed value
-        line = (mark.line + 1) if mark else 1
-        col = (mark.column + 1) if mark else 1
-
-        details = err.problem or err.context or "Invalid YAML syntax"
-        message = f"[L{line}C{col}] {details}"
-        raise YAMLParseError(message, line=line, col=col)
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        raise
     else:
         return cast(dict[str, Any], data)
 
@@ -215,7 +196,7 @@ def parse_text(content: str) -> Script:
     tags = header.get("audience", []) + header.get("tags", [])
     published = header.get("published", None)
     series = header.get("series", None)
-    characters = [load_dataclass(Character, data) for data in header["characters"]]
+    characters = [load_dataclass(Character, {"name": name, **data}) for name, data in header["characters"].items()]
     lines: list[Line] = []
     word_counts: dict[Character, int] = defaultdict(int)
     unspoken_words = 0

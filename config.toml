@@ -1,5 +1,5 @@
 # light | dark | system  (default=system)
-mode: system
+mode = "system"
 
 # font size (pt) used for the editor and preview windows (default=12)
-font_size: 12
+font_size = 12

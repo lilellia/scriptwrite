@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import sys
 import textwrap
+import tomllib
 from typing import cast, Literal
 
 from scriptwrite.log import logger
@@ -368,9 +369,10 @@ class LiveEditor(QMainWindow):
         """Update the content of the preview pane."""
         try:
             script = parser.parse_text(self._editor.content)
-        except parser.YAMLParseError as err:
-            self._status_bar.ephemeral(err.message)
-            self._editor.show_syntax_error(err.message, err.line, col=None)
+        except tomllib.TOMLDecodeError as err:
+            # we have to add one to the line number to account for the +++ fence
+            self._status_bar.set(f"[L{err.lineno + 1}C{err.lineno}] {err.msg}")
+            self._editor.show_syntax_error(err.msg, err.lineno + 1, col=None)
             return
 
         self._preview.write(script)
@@ -379,29 +381,24 @@ class LiveEditor(QMainWindow):
         self._status_bar["word-counts"].content = f"[Word Counts] {script.word_count_display}"
 
     def _insert_header(self) -> None:
-        header_template = textwrap.dedent("""
-        ---
-        title: script title
-        author: script author
-        summary: script description
-        audience:
-          - A4A
-        taglist:
-          - tag1
-          - tag2
-        characters:
-          - name: Alice
-            aliases:
-              - A
-            colour: ff6ae6
-            summary: ...
-          - name: Bob
-            aliases:
-              - B
-            colour: 139ad9
-            summary: ...
-        published:
-        ---
+        header_template = textwrap.dedent("""\
+        +++
+        title = "script title"
+        author = "script author"
+        summary = "script description"
+        audience = ["A4A"]  # can include multiple tags, such as ["F4A", "M4A"]
+        tags = ["tag1", "tag2"]
+
+        [characters.Alice]  # defines a character named Alice
+        aliases = ["A"]     # allows "A: some text" to register as Alice's dialogue
+        colour = "#ff6ae6"
+        summary: ...
+
+        [characters.Bob]
+        aliases = ["B"]
+        colour = "#139ad9"
+        summary: ...
+        +++
         """)
         self._editor.content = f"{header_template}\n{self._editor.content}"
 

@@ -5,8 +5,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast, NamedTuple, TYPE_CHECKING
 
-from PySide6.QtGui import QColor, QTextBlock, QTextCursor
+from PySide6.QtGui import QTextBlock, QTextCursor
 from PySide6.QtWidgets import QTextEdit, QToolTip
+
+from scriptwrite.widgets.display import Color
 
 if TYPE_CHECKING:
     # TextArea holds a reference to Cursor, so we end up in an import cycle without the TYPE_CHECKING guard
@@ -191,7 +193,7 @@ class Cursor:
 
         sel = QTextEdit.ExtraSelection()
         sel.cursor = cur
-        sel.format.setBackground(QColor("#50FF0000"))
+        sel.format.setBackground(Color.from_rgb(255, 0, 0).dimmed(0.3)._proxy)
 
         self._parent.setExtraSelections([sel])
         self.show_tooltip(sel, error)
