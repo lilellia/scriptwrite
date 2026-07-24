@@ -2,11 +2,13 @@ from enum import IntEnum
 import sys
 from typing import Any, assert_never, cast, TypedDict
 
+from PySide6.QtWidgets import QApplication
+
 from scriptwrite import renderers
 from scriptwrite.log import logger
 from scriptwrite.parser import Character, LineType, Script
 from scriptwrite.widgets import qre
-from scriptwrite.widgets.display import SyntaxHighlighter, TextStyle
+from scriptwrite.widgets.display import Color, SyntaxHighlighter, TextStyle
 from scriptwrite.widgets.text import BlockFormat, TextArea, UserData
 
 if sys.version_info >= (3, 12):
@@ -14,7 +16,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QFontMetricsF, QTextBlock
+from PySide6.QtGui import QFontMetricsF, QPalette, QTextBlock
 
 
 class EditorPane(TextArea):
@@ -34,8 +36,12 @@ class _BlockState(IntEnum):
 
 
 class Highlighter(SyntaxHighlighter):
+    @staticmethod
+    def _text_color() -> Color:
+        return Color(QApplication.palette().color(QPalette.ColorRole.Text))
+
     def highlight_yaml_header(self, text: str) -> None:
-        style = TextStyle(fg="#FFFFFF").dimmed(0.4)
+        style = TextStyle(fg=self._text_color()).dimmed(0.4)
 
         if self.previous_block_state == _BlockState.UNINITIALIZED:
             # first line of the file
@@ -54,7 +60,7 @@ class Highlighter(SyntaxHighlighter):
             self.block_state = _BlockState.YAML_HEADER_CLOSED
 
     def highlight_color_attribute(self, text: str) -> None:
-        if match := qre.search(r"\bcolou?r: ([0-9A-Fa-f]{6})\b", text):
+        if match := qre.search(r"\bcolou?r: \"?([0-9A-Fa-f]{6})\"?", text):
             style = TextStyle(fg=f"#{match.group(1)}")
             self.apply(style, *match.span())
 
