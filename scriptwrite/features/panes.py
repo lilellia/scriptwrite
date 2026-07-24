@@ -2,7 +2,7 @@ from enum import IntEnum
 import sys
 from typing import Any, assert_never, cast, TypedDict
 
-from PySide6.QtWidgets import QApplication, QToolTip
+from PySide6.QtWidgets import QToolTip
 
 from scriptwrite import renderers
 from scriptwrite.log import logger
@@ -16,7 +16,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QFontMetricsF, QPalette, QTextBlock
+from PySide6.QtGui import QFontMetricsF, QTextBlock
 
 
 class EditorPane(TextArea):
@@ -43,12 +43,8 @@ class _BlockState(IntEnum):
 
 
 class Highlighter(SyntaxHighlighter):
-    @staticmethod
-    def _text_color() -> Color:
-        return Color(QApplication.palette().color(QPalette.ColorRole.Text))
-
     def highlight_yaml_header(self, text: str) -> None:
-        style = TextStyle(fg=self._text_color()).dimmed(0.4)
+        style = TextStyle(fg=Color.query("text").dimmed(0.4))
 
         if self.previous_block_state == _BlockState.UNINITIALIZED:
             # first line of the file

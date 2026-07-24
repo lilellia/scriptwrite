@@ -74,6 +74,8 @@ class LiveEditor(QMainWindow):
         self._filepath: Path | None = None
         if path:
             self._open_file(path)
+        else:
+            self._new_file()
 
         self._load_autosave()
 
@@ -184,6 +186,7 @@ class LiveEditor(QMainWindow):
 
         self._filepath = None
         self._editor.content = ""
+        self._insert_header()
         self.dirty = False
 
     def _open_file(self, path: Path) -> None:

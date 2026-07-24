@@ -1,12 +1,36 @@
-from typing import Self, TypedDict, Unpack
+from typing import Literal, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
 
 from PySide6.QtCore import QObject, QRectF
-from PySide6.QtGui import QColor, QPaintDevice, QPainter, QSyntaxHighlighter, QTextCharFormat
-from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QColor, QPaintDevice, QPainter, QPalette, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtWidgets import QApplication, QWidget
 
 from scriptwrite.types import QtValueType
 from scriptwrite.widgets.descriptors import QtProperty
+
+ColorRole: TypeAlias = Literal[
+    "window",
+    "window-text",
+    "base",
+    "alternative-base",
+    "tooltip-base",
+    "tooltip-text",
+    "placeholder-text",
+    "text",
+    "button",
+    "button-text",
+    "bright-text",
+    "accent",
+    "dark",
+    "highlight",
+    "highlighted-text",
+    "light",
+    "link",
+    "link-visited",
+    "mid",
+    "midlight",
+    "shadow",
+]
 
 
 class Color:
@@ -90,6 +114,9 @@ class Color:
     def with_alpha(self, alpha: int) -> Self:
         return type(self).from_rgb(r=self.red, g=self.green, b=self.blue, a=alpha)
 
+    def dimmed(self, factor: float) -> Self:
+        return type(self).from_rgb(r=self.red, g=self.green, b=self.blue, a=round(self.alpha * factor))
+
     def with_lightness_scale(self, factor: float) -> Self:
         if factor >= 1:
             color = self._proxy.lighter(round(100 * factor))
@@ -97,6 +124,36 @@ class Color:
             color = self._proxy.darker(round(100 / factor))
 
         return type(self)(color)
+
+    @classmethod
+    def query(cls, role: ColorRole) -> Self:
+        lookup = {
+            "window": QPalette.ColorRole.Window,
+            "window-text": QPalette.ColorRole.WindowText,
+            "base": QPalette.ColorRole.Base,
+            "alternative-base": QPalette.ColorRole.AlternateBase,
+            "tooltip-base": QPalette.ColorRole.ToolTipBase,
+            "tooltip-text": QPalette.ColorRole.ToolTipText,
+            "placeholder-text": QPalette.ColorRole.PlaceholderText,
+            "text": QPalette.ColorRole.Text,
+            "button": QPalette.ColorRole.Button,
+            "button-text": QPalette.ColorRole.ButtonText,
+            "bright-text": QPalette.ColorRole.BrightText,
+            "accent": QPalette.ColorRole.Accent,
+            "dark": QPalette.ColorRole.Dark,
+            "highlight": QPalette.ColorRole.Highlight,
+            "highlighted-text": QPalette.ColorRole.HighlightedText,
+            "light": QPalette.ColorRole.Light,
+            "link": QPalette.ColorRole.Link,
+            "link-visited": QPalette.ColorRole.LinkVisited,
+            "mid": QPalette.ColorRole.Mid,
+            "midlight": QPalette.ColorRole.Midlight,
+            "shadow": QPalette.ColorRole.Shadow,
+        }
+
+        palette = QApplication.palette()
+        e = lookup[role]
+        return cls(palette.color(e))
 
 
 class TextStyleParams(TypedDict, total=False):
@@ -179,8 +236,7 @@ class TextStyle(QTextCharFormat):
         if self.fg is None:
             raise ValueError("Cannot call `dimmed` on a style without a defined color.")
 
-        a = round(factor * self.fg.alpha)
-        return self.replace(fg=self.fg.with_alpha(a))
+        return self.replace(fg=self.fg.dimmed(factor))
 
     @property
     def bold(self) -> bool:
