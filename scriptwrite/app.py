@@ -70,6 +70,7 @@ class LiveEditor(QMainWindow):
             "current": config.font_size,
         }
         self._change_font_size()
+        self._dirty: bool = False
 
         self._filepath: Path | None = None
         if path:
@@ -78,8 +79,6 @@ class LiveEditor(QMainWindow):
             self._new_file()
 
         self._load_autosave()
-
-        self._dirty: bool = False
 
         self._render_timer = Timer(duration=200, callback=self._compile)
         self._autosave_timer = Timer(duration=10000, callback=self._autosave)
