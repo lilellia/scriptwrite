@@ -27,4 +27,4 @@ jobs:
             - uses: actions/upload-artifact@v4
               with:
                   name: scriptwrite-v0.1
-                  path: dist/*.exe
+                  path: dist/scriptwrite.dist/
