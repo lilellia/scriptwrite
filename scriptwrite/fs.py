@@ -74,10 +74,10 @@ def open_file(path: Path) -> None:
             os.startfile(str(path))  # type: ignore[attr-defined]  (startfile is Windows-only)
 
         case "darwin":
-            subprocess.run(("open", path))
+            subprocess.Popen(("open", path))
 
         case "linux":
-            subprocess.run(("xdg-open", path))
+            subprocess.Popen(("xdg-open", path))
 
         case _:
             from scriptwrite.log import logger
