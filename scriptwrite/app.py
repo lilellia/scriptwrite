@@ -375,6 +375,7 @@ class LiveEditor(QMainWindow):
             self._editor.show_syntax_error(err.msg, err.lineno + 1, col=None)
             return
 
+        self._status_bar.set("", force=False)
         self._preview.write(script)
         self._scroll_sync(force=True)
 

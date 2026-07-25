@@ -1,7 +1,6 @@
 import ast
 from enum import IntEnum
 import sys
-import tomllib
 from typing import Any, assert_never, cast, TypedDict
 
 from PySide6.QtWidgets import QToolTip

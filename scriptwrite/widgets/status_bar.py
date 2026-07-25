@@ -25,9 +25,10 @@ class StatusBar(QStatusBar):
     def _restore_permanent_message(self) -> None:
         super().showMessage(self._permanent_message)
 
-    def set(self, message: str = "") -> None:
+    def set(self, message: str = "", *, force: bool = True) -> None:
         self._permanent_message = message
-        super().showMessage(message)
+        if force:
+            super().showMessage(message)
 
     def ephemeral(self, message: str, duration: int = 2500) -> None:
         super().showMessage(message, duration)
