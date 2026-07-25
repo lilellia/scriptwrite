@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 from typing import Self
@@ -65,6 +66,23 @@ def atomic_write(content: str, path: Path) -> None:
     except Exception:
         Path(f.name).unlink(missing_ok=True)
         raise
+
+
+def open_file(path: Path) -> None:
+    match sys.platform:
+        case "win32":
+            os.startfile(str(path))  # type: ignore[attr-defined]  (startfile is Windows-only)
+
+        case "darwin":
+            subprocess.run(("open", path))
+
+        case "linux":
+            subprocess.run(("xdg-open", path))
+
+        case _:
+            from scriptwrite.log import logger
+
+            logger.error(f"Could not open file {path} on unknown system.")
 
 
 def mkdir_p(path: Path, mode: int = 0o777) -> None:

@@ -127,6 +127,8 @@ class LiveEditor(QMainWindow):
                 MenuItemData("&Paste", self._editor.paste, shortcut="Ctrl+V"),
                 MenuItemData("---", None),
                 MenuItemData("&Find/Replace", self._find_toolbar.toggle, shortcut=("Ctrl+F", "Ctrl+H")),
+                MenuItemData("---", None),
+                MenuItemData("&Edit Config", self._open_config_file, shortcut=("Ctrl+,")),
             ],
             "&Tools": [
                 MenuItemData(
@@ -357,6 +359,14 @@ class LiveEditor(QMainWindow):
         repl = match.expand(replacement)
         self._editor.content = self._editor.content[:start] + repl + self._editor.content[end:]
         self._editor._cursor.select(start, start + len(repl))
+
+    def _open_config_file(self) -> None:
+        path = fs.APP_DIRS.config / "config.toml"
+
+        if not path.exists():
+            config.write
+
+        fs.open_file(path)
 
     def _on_change(self) -> None:
         """Called when the editor pane's content changes. Registers the update for the preview pane."""

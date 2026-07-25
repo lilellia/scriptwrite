@@ -1,4 +1,5 @@
 from dataclasses import dataclass, fields
+import textwrap
 import tomllib
 from typing import Literal, Self
 
@@ -10,6 +11,22 @@ from scriptwrite.log import logger
 class Config:
     mode: Literal["light", "dark", "system"] = "system"
     font_size: int = 12
+
+    def write(self) -> None:
+        path = APP_DIRS.config / "config.toml"
+
+        config = textwrap.dedent(f"""\
+        # Changes only take effect when scriptwrite is loaded
+
+        # "light" | "dark" | "system"  (default = "system")
+        mode: "{self.mode}"
+
+        # font size (pt)  (default = 12)
+        font_size: {self.font_size}
+        """)
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(config)
 
     @classmethod
     def load(cls) -> Self:
