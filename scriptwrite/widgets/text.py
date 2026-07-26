@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 import sys
@@ -225,6 +226,14 @@ class TextArea(QTextEdit):
         """
         for fragment in self.fragments():
             yield from anchors_of(fragment)
+
+    def scroll_to_top(self) -> None:
+        if block := next(self.blocks(), None):
+            self.scroll_to_block(block)
+
+    def scroll_to_bottom(self) -> None:
+        if blocks := deque(self.blocks(), maxlen=1):
+            self.scroll_to_block(blocks.pop())
 
 
 class BlockFormat:

@@ -147,6 +147,7 @@ class LiveEditor(QMainWindow):
 
     def _init_shortcuts(self) -> list[Shortcut]:
         return [
+            Shortcut("Ctrl+G", self, callback=self._editor.scroll_to_bottom),
             # font size changes
             Shortcut("Ctrl++", self, callback=partial(self._change_font_size, direction=1)),
             Shortcut("Ctrl+-", self, callback=partial(self._change_font_size, direction=-1)),
