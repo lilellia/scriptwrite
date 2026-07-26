@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import atexit
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import IntEnum
@@ -13,6 +14,7 @@ from pathlib import Path
 from queue import Queue
 import sys
 from threading import Thread
+import time
 from typing import Any, Protocol, TextIO
 
 from typing_extensions import override
@@ -121,8 +123,11 @@ class SinkHandler(Handler):
         if not self.should_emit(record):
             return
 
-        output = self.format.format(**asdict(record), **extra)
+        kw = asdict(record)
+        if extra:
+            kw["message"] = f"{record.message} (kwargs={extra})"
 
+        output = self.format.format(**kw)
         self.stream.write(output + "\n")
         self.stream.flush()
 
@@ -260,6 +265,15 @@ class Logger:
 
         for handler in self.handlers.values():
             _log_queue.put((handler, record, extra))
+
+    @contextmanager
+    def stopwatch(self, message: str) -> Iterator[None]:
+        start = time.perf_counter_ns()
+        try:
+            yield
+        finally:
+            ms = (time.perf_counter_ns() - start) / 1e6
+            self.debug(f"[{ms:,.1f} ms] {message}")
 
 
 def _queue_handler(q: Queue) -> None:

@@ -1,10 +1,15 @@
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 import textwrap
 import tomllib
-from typing import Literal, Self
+from typing import Literal, Self, TypedDict
 
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
+
+
+class ConfigDict(TypedDict):
+    mode: Literal["light", "dark", "system"]
+    font_size: int
 
 
 @dataclass(slots=True)
@@ -51,3 +56,6 @@ class Config:
         kwargs = {k: v for k, v in kwargs.items() if k in valid_keys}
 
         return cls(**kwargs)
+
+    def as_dict(self) -> ConfigDict:
+        return ConfigDict(**asdict(self))

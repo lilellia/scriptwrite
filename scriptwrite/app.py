@@ -38,7 +38,7 @@ from scriptwrite.widgets import (
 )
 
 config = Config.load()
-logger.info(f"Loaded {config=}")
+logger.info("Loaded config", **config.as_dict())
 
 _app = Application(["scriptwrite"], mode=config.mode)
 
@@ -378,7 +378,8 @@ class LiveEditor(QMainWindow):
     def _compile(self) -> None:
         """Update the content of the preview pane."""
         try:
-            script = parser.parse_text(self._editor.content)
+            with logger.stopwatch("parsing script"):
+                script = parser.parse_text(self._editor.content)
         except tomllib.TOMLDecodeError as err:
             # we have to add one to the line number to account for the +++ fence
             self._status_bar.set(f"[L{err.lineno + 1}C{err.lineno}] {err.msg}")
@@ -442,9 +443,10 @@ class LiveEditor(QMainWindow):
 
         f = self._font_sizes["current"]
 
-        set_font_size(self._editor, f)
-        set_font_size(self._preview, f)
-        self._preview.update_block_formatting()
+        with logger.stopwatch(f"updating font size to {f}"):
+            set_font_size(self._editor, f)
+            set_font_size(self._preview, f)
+            self._preview.update_block_formatting()
 
     def run(self) -> None:
         super().showMaximized()
