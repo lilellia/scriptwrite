@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import atexit
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from datetime import date, datetime
 from enum import Enum, IntEnum
 import inspect
@@ -51,31 +51,52 @@ class Level(IntEnum):
     FATAL = 60
 
 
-class JSONEncoder(json.JSONEncoder):
-    @override
-    def default(self, o: Any) -> Any:
-        if hasattr(o, "__json__"):
-            return o.__json__()
+def serialize(obj: Any) -> Any:
+    if hasattr(obj, "__json__"):
+        return serialize(obj.__json__())
 
-        if hasattr(o, "to_dict"):
-            return o.to_dict()
+    if isinstance(obj, Enum):
+        # we explicitly check this before the standard type checks
+        # to prevent IntEnum and StrEnum from fucking everything up
+        return f"<{type(obj).__name__}.{obj.name}: {repr(obj.value)}>"
 
-        if hasattr(o, "__dataclass_fields__"):
-            return asdict(o)
+    if isinstance(obj, bool):
+        # we check bool separately since bool < int
+        return obj
 
-        if isinstance(o, (datetime, date)):
-            return o.isoformat()
+    if isinstance(obj, (str, int, float, type(None))):
+        # the standard leaf types in JSON
+        return obj
 
-        if isinstance(o, Enum):
-            return o.name
+    if isinstance(obj, (bytes, bytearray, memoryview)):
+        # b'abc' --> "b'abc'"
+        return repr(obj)
 
-        if isinstance(o, Exception):
-            return {"type": type(o).__name__, "message": str(o)}
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
 
-        try:
-            super().default(o)
-        except TypeError:
-            return {"type": type(o).__name__, "__repr__": repr(o), "__str__": str(o)}
+    if isinstance(obj, Exception):
+        return {"type": type(obj).__name__, "message": str(obj)}
+
+    if is_dataclass(obj) and not isinstance(obj, type):
+        # is_dataclass() returns true for both DataclassInstance and type[DataclassInstance]
+        # which... is completely indefensible
+        return serialize({f.name: getattr(obj, f.name) for f in fields(obj) if hasattr(obj, f.name)})
+
+    if isinstance(obj, Mapping):
+        return {str(k): serialize(v) for k, v in obj.items()}
+
+    if isinstance(obj, Sequence):
+        # we've already checked if obj is str, so this is safe
+        return [serialize(elem) for elem in obj]
+
+    # fallback to basically just a Python core dump
+    fallback = {"type": type(obj).__name__, "__repr__": repr(obj)}
+
+    if str(obj) != repr(obj):
+        fallback["__str__"] = str(obj)
+
+    return fallback
 
 
 def _parse_log_level(level: Level | str) -> Level:
@@ -179,12 +200,8 @@ class FileHandler(Handler):
         if self.rotation is not None and self.path.exists() and self.path.stat().st_size > self.rotation:
             self.rotate()
 
-        data = asdict(record)
-        # serialize the record fields that aren't natively serializable
-        data["time"] = data["time"].isoformat()
-        data["level"] = data["level"].name
-
-        output = json.dumps({**data, **extra}, cls=JSONEncoder)
+        data = serialize({**asdict(record), **extra})
+        output = json.dumps(data)
 
         with open(self.path, "a", encoding="utf-8") as f:
             f.write(output + "\n")
