@@ -3,3 +3,10 @@ mode = "system"
 
 # font size (pt) used for the editor and preview windows (default=12)
 font_size = 12
+
+# Whether the application should pull GTK styling (default=false)
+# This value is ignored on non-Linux systems.
+use_gtk_style = false
+
+# the color of the block highlight used to mark the scroll-sync paragraph (default = "#fff3cd")
+highlight_color = "#fff3cd"

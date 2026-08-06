@@ -40,7 +40,7 @@ from scriptwrite.widgets import (
 config = Config.load()
 logger.info("Loaded config", **config.as_dict())
 
-_app = Application(["scriptwrite"], mode=config.mode)
+_app = Application(["scriptwrite"], config=config)
 
 
 class LiveEditor(QMainWindow):

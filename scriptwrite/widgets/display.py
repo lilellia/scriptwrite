@@ -125,6 +125,15 @@ class Color:
 
         return type(self)(color)
 
+    def __str__(self) -> str:
+        return self.as_hex()
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}.from_hex('{self.as_hex()}')"
+
+    def __json__(self) -> str:
+        return self.__repr__()
+
     @classmethod
     def query(cls, role: ColorRole) -> Self:
         lookup = {

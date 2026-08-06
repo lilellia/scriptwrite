@@ -5,12 +5,13 @@ import os
 from os import PathLike
 from pathlib import Path
 import sys
-from typing import Any, assert_never, IO, Literal
+from typing import Any, assert_never, ClassVar, IO, Literal, Self
 
 from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Qt
 from PySide6.QtGui import QPalette, QStyleHints
 from PySide6.QtWidgets import QApplication, QStyle, QStyleFactory
 
+from scriptwrite.config import Config
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
 from scriptwrite.types import F
@@ -18,16 +19,36 @@ from scriptwrite.widgets.signals import QtSignalProperty
 
 
 class Application(QApplication):
-    def __init__(self, *args: Any, mode: Literal["light", "dark", "system"] = "system", **kwargs: Any) -> None:
+    __singleton__: ClassVar[Self | None] = None
+
+    def __init__(
+        self,
+        *args: Any,
+        config: Config,
+        **kwargs: Any,
+    ) -> None:
+        if type(self).__singleton__ is not None:
+            raise RuntimeError("Cannot instantiate multiple Application instances")
+
         self._crashfile = self._enable_crash_handler()
+        self.config = config
 
         if sys.platform.startswith("linux"):
             self._force_ime()
             self._extend_qt6_plugin_paths()
 
+            if not self.config.use_gtk_style:
+                self._force_non_gtk_style()
+
         super().__init__(*args, **kwargs)
         self.theme = "Fusion"
-        self.mode = mode
+        self.mode = self.config.mode
+
+        type(self).__singleton__ = self
+
+    @classmethod
+    def singleton(cls) -> Self | None:
+        return cls.__singleton__
 
     @property
     def style_hints(self) -> QStyleHints:
@@ -68,7 +89,7 @@ class Application(QApplication):
 
             case "system":
                 super().styleHints().setColorScheme(Qt.ColorScheme.Unknown)
-                super().setPalette(QPalette())
+                # super().setPalette(QPalette())
                 super().setStyle(QStyleFactory.create("Fusion"))
 
             case _:
@@ -97,6 +118,11 @@ class Application(QApplication):
             if Path(path).exists():
                 logger.info(f"Adding plugin path: {path}")
                 QCoreApplication.addLibraryPath(path)
+
+    @staticmethod
+    def _force_non_gtk_style() -> None:
+        # just... lie and tell Qt that we're using KDE ^_^
+        os.environ["XDG_CURRENT_DESKTOP"] = "KDE"
 
 
 class FileWatcher(QFileSystemWatcher):
