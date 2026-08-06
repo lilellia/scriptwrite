@@ -5,8 +5,8 @@ import atexit
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
-from datetime import datetime
-from enum import IntEnum
+from datetime import date, datetime
+from enum import Enum, IntEnum
 import inspect
 import json
 from os import PathLike
@@ -49,6 +49,33 @@ class Level(IntEnum):
     ERROR = 40
     CRITICAL = 50
     FATAL = 60
+
+
+class JSONEncoder(json.JSONEncoder):
+    @override
+    def default(self, o: Any) -> Any:
+        if hasattr(o, "__json__"):
+            return o.__json__()
+
+        if hasattr(o, "to_dict"):
+            return o.to_dict()
+
+        if hasattr(o, "__dataclass_fields__"):
+            return asdict(o)
+
+        if isinstance(o, (datetime, date)):
+            return o.isoformat()
+
+        if isinstance(o, Enum):
+            return o.name
+
+        if isinstance(o, Exception):
+            return {"type": type(o).__name__, "message": str(o)}
+
+        try:
+            super().default(o)
+        except TypeError:
+            return {"type": type(o).__name__, "__repr__": repr(o), "__str__": str(o)}
 
 
 def _parse_log_level(level: Level | str) -> Level:
@@ -152,13 +179,12 @@ class FileHandler(Handler):
         if self.rotation is not None and self.path.exists() and self.path.stat().st_size > self.rotation:
             self.rotate()
 
-        data = {**asdict(record), **extra}
-
-        # serialize the fields that aren't natively serializable
+        data = asdict(record)
+        # serialize the record fields that aren't natively serializable
         data["time"] = data["time"].isoformat()
         data["level"] = data["level"].name
 
-        output = json.dumps(data)
+        output = json.dumps({**data, **extra}, cls=JSONEncoder)
 
         with open(self.path, "a", encoding="utf-8") as f:
             f.write(output + "\n")
