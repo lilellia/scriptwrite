@@ -20,8 +20,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QLabel, QLineEdit, QTextEdit, QWidget
 
-from scriptwrite.widgets.system import Application
-
 if sys.version_info >= (3, 12):
     from typing import override
 else:
@@ -91,11 +89,10 @@ class TextArea(QTextEdit):
         self._cursor = Cursor(parent=self)
 
         # improve selection highlight colour contrast
-        self._selection_color = Color.from_hex("#3E5D74")
-        super().setStyleSheet(f""" QTextEdit {{ selection-background-color: {self._selection_color.as_hex()}; }} """)
+        super().setStyleSheet(f""" QTextEdit {{ selection-background-color: {Color.query("highlight").as_hex()}; }} """)
 
         # implement block highlighting
-        self._highlight_color = cast(Application, Application.singleton()).config.highlight_color
+        self._highlight_color = Color.query("accent")
         self._highlighted_block: QTextBlock | None = None
         self._highlight_animation: AnimatedAction[int] | None = None
 

@@ -1,19 +1,16 @@
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, fields
 import textwrap
 import tomllib
 from typing import Literal, Self, TypedDict
 
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
-from scriptwrite.utils import load_dataclass
-from scriptwrite.widgets.display import Color
 
 
 class ConfigDict(TypedDict):
     mode: Literal["light", "dark", "system"]
     font_size: int
     use_gtk_style: bool
-    highlight_color: Color
 
 
 @dataclass(slots=True)
@@ -21,9 +18,6 @@ class Config:
     mode: Literal["light", "dark", "system"] = "system"
     font_size: int = 12
     use_gtk_style: bool = False
-    highlight_color: Color = field(
-        default_factory=lambda: Color.from_hex("#FFF3CD"), metadata=dict(converter=Color.from_hex)
-    )
 
     def write(self) -> None:
         path = APP_DIRS.config / "config.toml"
@@ -40,9 +34,6 @@ class Config:
         # Whether the application should pull GTK styling (default=false)
         # This value is ignored on non-Linux systems.
         use_gtk_style = {str(self.use_gtk_style).lower()}
-
-        # the color of the block highlight used to mark the scroll-sync paragraph (default = "$FFF3CD")
-        highlight_color = "{self.highlight_color}"
         """)
 
         with open(path, "w", encoding="utf-8") as f:
@@ -69,7 +60,7 @@ class Config:
 
         kwargs = {k: v for k, v in kwargs.items() if k in valid_keys}
 
-        return load_dataclass(cls, kwargs)
+        return cls(**kwargs)
 
     def as_dict(self) -> ConfigDict:
         return ConfigDict(**asdict(self))

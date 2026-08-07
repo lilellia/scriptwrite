@@ -6,7 +6,8 @@ font_size = 12
 
 # Whether the application should pull GTK styling (default=false)
 # This value is ignored on non-Linux systems.
+# If `true`, desktop environments which use GTK (GNOME, Cinnamon, etc.) will be allowed to inject GTK styles.
+# Note that this does not mean that non-GTK DEs (KDE, LXQt, etc.) will use GTK styling.
+#
+# (Specifically, setting this field to true mocks the environment as "KDE".)
 use_gtk_style = false
-
-# the color of the block highlight used to mark the scroll-sync paragraph (default = "#fff3cd")
-highlight_color = "#fff3cd"
