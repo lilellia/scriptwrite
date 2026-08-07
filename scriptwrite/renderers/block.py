@@ -8,13 +8,20 @@ from scriptwrite.widgets.text import BlockFormat, TextBlock
 
 
 def render_header(script: Script, cursor: QTextCursor) -> None:
+    # TITLE
     with TextBlock(cursor) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12, heading=1)
         block.write(script.title, TextStyle(bold=True))
 
+    # AUTHOR
     with TextBlock(cursor) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12, heading=2)
         block.write(script.author, TextStyle(bold=True))
+
+    # SUMMARY
+    with TextBlock(cursor) as block:
+        block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12)
+        block.write(script.summary, TextStyle(italic=True))
 
 
 def render_dialogue(line: Line, cursor: QTextCursor) -> None:
