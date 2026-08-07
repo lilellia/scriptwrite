@@ -76,8 +76,10 @@ class LiveEditor(QMainWindow):
         self._filepath: Path | None = None
         if path:
             self._open_file(path)
+            logger.info("Loaded initial file", path=path)
         else:
             self._new_file()
+            logger.debug("Creating new empty file")
 
         self._load_autosave()
 
@@ -197,7 +199,11 @@ class LiveEditor(QMainWindow):
         self._filepath = path
 
         with self._editor.suppress_signals():
-            self._editor.content = path.read_text()
+            try:
+                self._editor.content = path.read_text()
+                logger.debug("Successfully read file", path=path)
+            except OSError as err:
+                logger.error("Failed to read file", path=path, err=err)
 
         self.dirty = False
         self._compile()
