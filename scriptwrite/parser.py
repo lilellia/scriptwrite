@@ -206,8 +206,8 @@ def parse_text(content: str) -> Script:
         if not line.strip():
             continue
 
-        if line.startswith("[//]"):
-            content = line.removeprefix("[//]").strip()
+        if line.startswith("//"):
+            content = line.removeprefix("//").strip()
             lines.append(Line(index, LineType.COMMENT, speaker=None, text_runs=[TextRun(TextRunType.NORMAL, content)]))
 
         elif line.startswith("++"):
