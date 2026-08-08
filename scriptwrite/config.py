@@ -25,7 +25,12 @@ class Config:
         config = textwrap.dedent(f"""\
         # Changes only take effect when scriptwrite is loaded
 
-        # breeze-light | breeze-dark | dracula | catpuccin-latte | catpuccin-mocha | ayu-dark (default = "breeze-dark")
+        # The color theme for the application (default = "breeze-dark")
+        # light themes: alucard | ayu-light | breeze-light | catpuccin-latte | github-light
+        # dark themes: ayu-dark | ayu-mirage | breeze-dark | catpuccin-mocha | dracula | github-dark
+        #
+        # You can also use any theme defined in {APP_DIRS.config / "themes"}.
+        #
         # Use theme = "none" to query the system.
         theme = "{self.theme}"
 

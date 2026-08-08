@@ -2,6 +2,8 @@ from itertools import pairwise
 import sys
 from typing import Any, cast, Self
 
+from PySide6.QtGui import QPalette
+
 if sys.version_info >= (3, 12):
     from typing import override
 else:
@@ -20,6 +22,10 @@ class Toolbar(Frame):
         super().__init__(parent, *args, **kwargs)
 
         super().setWindowFlags(Qt.WindowType.Widget | Qt.WindowType.FramelessWindowHint)
+
+        p = super().palette()
+        p.setColor(QPalette.ColorRole.Window, p.color(QPalette.ColorRole.AlternateBase))
+        super().setPalette(p)
 
         self.autofill_bg = True
         self.frame_shape = "box"

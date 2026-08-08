@@ -1,0 +1,17 @@
+# Taken from https://github.com/ayu-theme/ayu-colors
+
+[All]
+Window          = "#FCFCFC"     # Editor (background)
+WindowText      = "#5C6166"     # Editor (foreground)
+Base            = "#FCFCFC"     # Editor (background)
+AlternateBase   = "#F8F9FA"     # UI (background)
+ToolTipBase     = "#F8F9FA"     # UI (background)
+ToolTipText     = "#828E9F"     # UI (foreground)
+PlaceholderText = "#828E9F"     # UI (foreground)
+Text            = "#5C6166"     # Editor (foreground)
+Button          = "#F8F9FA"     # UI (background)
+ButtonText      = "#828E9F"     # UI (foreground)
+BrightText      = "#86878C"     # Terminal (black)
+Highlight       = "#26035BD6"   # Editor (selection.active)
+HighlightedText = "#5C6166"     # Editor (foreground)
+Accent          = "#F29718"     # Common (accent.tint)

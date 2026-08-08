@@ -15,8 +15,8 @@ from scriptwrite.config import Config
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
 from scriptwrite.types import F
-from scriptwrite.widgets.signals import QtSignalProperty
 from scriptwrite.widgets.display import load_theme
+from scriptwrite.widgets.signals import QtSignalProperty
 
 
 class Application(QApplication):
@@ -73,7 +73,8 @@ class Application(QApplication):
     def theme(self, value: str, /) -> None:
         try:
             self._palette = load_theme(value)
-        except ValueError:
+        except Exception as err:
+            logger.error("Failed to read theme", theme=value, err=err)
             value = "breeze-dark"
             self._palette = load_theme("breeze-dark")
 

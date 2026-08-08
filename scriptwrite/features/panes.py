@@ -48,7 +48,7 @@ class _BlockState(IntEnum):
 
 class Highlighter(SyntaxHighlighter):
     def highlight_toml_header(self, text: str) -> None:
-        style = TextStyle(fg=Color.query("text").dimmed(0.4))
+        style = TextStyle(fg=Color.query("custom.dim-3"))
 
         if self.previous_block_state == _BlockState.UNINITIALIZED:
             # first line of the file
@@ -78,7 +78,7 @@ class Highlighter(SyntaxHighlighter):
                 self.apply(style, *match.span(1))
 
     def highlight_html_comment(self, text: str) -> None:
-        style = TextStyle(fg="#FFFFFF").dimmed(0.15)
+        style = TextStyle(fg=Color.query("custom.dim-2"))
 
         if (state := self.previous_block_state) == _BlockState.UNINITIALIZED:
             state = 0

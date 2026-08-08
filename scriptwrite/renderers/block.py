@@ -57,7 +57,7 @@ def render_listener(line: Line, cursor: QTextCursor) -> None:
 
     with TextBlock(cursor, **metadata) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=8)
-        color = Color.from_rgb(153, 153, 153)
+        color = Color.query("custom.dim-2")
 
         normal = TextStyle(fg=color, italic=True, underline=False)
         emph = TextStyle(fg=color, italic=True, underline=True)
@@ -84,7 +84,7 @@ def render_cue(line: Line, cursor: QTextCursor) -> None:
 
     with TextBlock(cursor, **metadata) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=8)
-        color = Color.from_rgb(89, 89, 89)
+        color = Color.query("custom.dim-3")
 
         normal = TextStyle(fg=color, italic=True, underline=False)
         emph = TextStyle(fg=color, italic=True, underline=True)
@@ -108,7 +108,7 @@ def render_comment(line: Line, cursor: QTextCursor) -> None:
 
     with TextBlock(cursor, **metadata) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=8)
-        color = Color.from_rgb(166, 133, 150)
+        color = Color.query("custom.dim-1")
 
         normal = TextStyle(fg=color, italic=True, underline=False)
         emph = TextStyle(fg=color, italic=True, underline=True)

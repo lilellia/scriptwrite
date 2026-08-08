@@ -1,0 +1,17 @@
+# Taken from ~/.local/share/zed/extensions/installed/github-theme
+
+[All]
+Window          = "#0D1117"     # editor.background
+WindowText      = "#F0F6FC"     # editor.foreground
+Base            = "#0D1117"     # editor.background
+AlternateBase   = "#151B23"     # hint.background
+ToolTipBase     = "#151B23"     # hint.background
+ToolTipText     = "#9198A1"     # hint
+PlaceholderText = "#9198A1"     # text.placeholder
+Text            = "#F0F6FC"     # editor.foreground
+Button          = "#151B23"     # hint.background
+ButtonText      = "#9198A1"     # hint
+BrightText      = "#4493F8"     # text.accent
+Highlight       = "#4D4493F8"   # editor.document_highlight.read_background
+HighlightedText = "#F0F6FC"     # editor.foreground
+Accent          = "#0576FF"     # style.accents[0]

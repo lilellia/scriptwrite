@@ -1,6 +1,7 @@
+from functools import cache
+import tomllib
 from typing import Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
-import tomllib
 
 from PySide6.QtCore import QObject, QRectF
 from PySide6.QtGui import QColor, QPaintDevice, QPainter, QPalette, QSyntaxHighlighter, QTextCharFormat
@@ -157,7 +158,16 @@ class Color:
         return self.__repr__()
 
     @classmethod
-    def query(cls, role: ColorRole) -> Self:
+    def lerp(cls, src: Self, dest: Self, factor: float) -> Self:
+        r = round(src.red + (dest.red - src.red) * factor)
+        g = round(src.green + (dest.green - src.green) * factor)
+        b = round(src.blue + (dest.blue - src.blue) * factor)
+
+        return cls.from_rgb(r, g, b)
+
+    @classmethod
+    @cache
+    def query(cls, role: ColorRole | Literal["custom.dim-1", "custom.dim-2", "custom.dim-3"]) -> Self:
         lookup = {
             "window": QPalette.ColorRole.Window,
             "window-text": QPalette.ColorRole.WindowText,
@@ -182,9 +192,20 @@ class Color:
             "shadow": QPalette.ColorRole.Shadow,
         }
 
+        dim_modifiers = {
+            "custom.dim-1": 0.30,
+            "custom.dim-2": 0.50,
+            "custom.dim-3": 0.75,
+        }
+
         palette = QApplication.palette()
-        e = lookup[role]
-        return cls(palette.color(e))
+
+        if role in lookup:
+            qcolor = palette.color(lookup[role])
+            return cls(qcolor)
+        else:
+            qcolor = palette.color(lookup["placeholder-text"])
+            return cls(qcolor).dimmed(dim_modifiers[role])
 
 
 class TextStyleParams(TypedDict, total=False):

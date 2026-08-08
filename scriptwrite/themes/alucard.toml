@@ -1,0 +1,23 @@
+# Taken from https://draculatheme.com/spec
+
+[All]
+Window          = "#FFFBEB"     # Background
+WindowText      = "#1F1F1F"     # Foreground
+
+Base            = "#FFFBEB"     # Background
+Text            = "#1F1F1F"     # Foreground
+
+AlternateBase   = "#EFEDDC"     # Floating interactive elements
+
+Button          = "#FFFBEB"     # Background
+ButtonText      = "#1F1F1F"     # Foreground
+
+ToolTipBase     = "#FFFBEB"     # Background
+ToolTipText     = "#1F1F1F"     # Foreground
+
+Highlight       = "#44475A"     # Selection
+HighlightedText = "#1F1F1F"     # Foreground
+
+PlaceholderText = "#6C664B"     # Comment
+
+Accent          = "#644AC9"     # Purple
