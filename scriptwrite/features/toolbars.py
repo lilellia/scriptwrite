@@ -2,6 +2,11 @@ from functools import partial
 import sys
 from typing import Literal, Protocol
 
+from scriptwrite.log import logger
+from scriptwrite.widgets.color_utils import color_groups
+from scriptwrite.widgets.display import Color
+from scriptwrite.widgets.frame import Frame, Tabbed
+
 if sys.version_info >= (3, 12):
     from typing import override
 else:
@@ -9,8 +14,8 @@ else:
 
 from PySide6.QtWidgets import QMainWindow
 
-from scriptwrite.widgets.actions import Shortcut
-from scriptwrite.widgets.layouts import Box
+from scriptwrite.widgets.actions import Action, ColorButton, Shortcut
+from scriptwrite.widgets.layouts import Box, FlexGrid
 from scriptwrite.widgets.text import Entry, Label
 from scriptwrite.widgets.toolbars import Toolbar, ToolbarActionGroup, ToolButton
 
@@ -142,3 +147,32 @@ class FindToolBar(Toolbar):
         if self.is_visible:
             self.search_input.setFocus()
             self.search_input.selectAll()
+
+
+class OnColorSelectFunction(Protocol):
+    def __call__(self, color: Color) -> None: ...
+
+
+class ColorSelector(Toolbar):
+    def __init__(self, parent: QMainWindow, on_select: OnColorSelectFunction) -> None:
+        super().__init__(parent)
+        self._on_select = on_select
+
+        self._color_groups = color_groups()
+        self._buttons: list[ColorButton] = []
+        with Box(self, direction="vertical") as box:
+            pane = box.add(Tabbed(self))
+
+            for key, group in self._color_groups.items():
+                frame = Frame(pane)
+                grid = FlexGrid(frame, max_columns=20)
+
+                for color in group:
+                    button = grid.add(ColorButton(color, Action("", self, callback=partial(self._emit, color=color))))
+                    self._buttons.append(button)
+
+                pane.add(key, frame)
+
+    def _emit(self, color: Color) -> None:
+        logger.debug("selected color", color=color)
+        self._on_select(color)

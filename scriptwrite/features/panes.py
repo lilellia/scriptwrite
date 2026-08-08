@@ -33,6 +33,9 @@ class EditorPane(TextArea):
         self._cursor.remove_extra_selections()
         QToolTip.hideText()
 
+    def write(self, text: str, /) -> None:
+        self._cursor._get().insertText(text)
+
 
 class _BlockState(IntEnum):
     UNINITIALIZED = -1

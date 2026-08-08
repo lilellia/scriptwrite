@@ -8,9 +8,11 @@ import textwrap
 import tomllib
 from typing import cast, Literal
 
+from scriptwrite.features.toolbars import ColorSelector
 from scriptwrite.log import logger
 from scriptwrite.utils import discard, find_text, make_needle
 from scriptwrite.widgets.actions import Shortcut
+from scriptwrite.widgets.color_utils import get_color_name
 from scriptwrite.widgets.display import set_font_size
 
 if sys.version_info >= (3, 12):
@@ -60,6 +62,9 @@ class LiveEditor(QMainWindow):
         self._preview.on_cursor_move = self._reverse_scroll_sync
 
         self._find_toolbar = FindToolBar(self, discard(self._find), self._replace).bind()
+        self._color_selector = ColorSelector(
+            self, on_select=lambda color: self._editor.write(get_color_name(color))
+        ).bind()
 
         self._menubar = self._init_menu()
         self._other_shortcuts = self._init_shortcuts()
@@ -137,7 +142,8 @@ class LiveEditor(QMainWindow):
                     "&Insert Header Template",
                     self._insert_header,
                     shortcut=("Ctrl+Shift+H"),
-                )
+                ),
+                MenuItemData("Insert &Color", self._color_selector.toggle, shortcut=("Ctrl+Shift+C")),
             ],
             "&Help": [
                 MenuItemData("&Help", self._show_help, shortcut="Ctrl+?"),

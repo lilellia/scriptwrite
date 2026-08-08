@@ -1,4 +1,4 @@
-from typing import Literal, Self, TypeAlias, TypedDict, Unpack
+from typing import Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
 
 from PySide6.QtCore import QObject, QRectF
@@ -31,6 +31,19 @@ ColorRole: TypeAlias = Literal[
     "midlight",
     "shadow",
 ]
+
+
+class RGBA(NamedTuple):
+    red: int
+    green: int
+    blue: int
+    alpha: int
+
+
+class HSL(NamedTuple):
+    hue: int
+    saturation: float
+    lightness: float
 
 
 class Color:
@@ -104,12 +117,18 @@ class Color:
     def alpha(self, value: int, /) -> None:
         self._stative_set("setAlpha", value)
 
-    def as_rgba(self) -> tuple[int, int, int, int]:
-        return self.red, self.green, self.blue, self.alpha
+    def as_rgba(self) -> RGBA:
+        return RGBA(self.red, self.green, self.blue, self.alpha)
 
     def as_hex(self) -> str:
         format = QColor.NameFormat.HexRgb if self.alpha == 0xFF else QColor.NameFormat.HexArgb
         return self._proxy.name(format=format)
+
+    def as_hsl(self) -> HSL:
+        hue = self._proxy.hslHue()
+        saturation = self._proxy.hslSaturationF()
+        lightness = self._proxy.lightnessF()
+        return HSL(hue, saturation, lightness)
 
     def with_alpha(self, alpha: int) -> Self:
         return type(self).from_rgb(r=self.red, g=self.green, b=self.blue, a=alpha)

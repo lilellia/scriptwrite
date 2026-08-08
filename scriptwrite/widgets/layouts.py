@@ -1,6 +1,6 @@
 from typing import Literal, overload, Self, TypeVar
 
-from PySide6.QtWidgets import QHBoxLayout, QLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLayout, QVBoxLayout, QWidget
 
 Q = TypeVar("Q", bound=QWidget)
 
@@ -48,3 +48,52 @@ class Box:
 
     def add_stretch(self) -> None:
         self._proxied.addStretch()
+
+
+class FlexGrid(QGridLayout):
+    def __init__(self, parent: QWidget | None, *items: QWidget, max_columns: int) -> None:
+        super().__init__(parent)
+        self._items: list[QWidget] = []
+        self._max_columns = max_columns
+
+        self._row, self._col = 0, 0
+
+        for item in items:
+            self.add(item)
+
+    @property
+    def max_columns(self) -> int:
+        return self._max_columns
+
+    @max_columns.setter
+    def max_columns(self, value: int, /) -> None:
+        self._max_columns = value
+        self.reflow()
+
+    def _place(self, item: Q) -> Q:
+        super().addWidget(item, self._row, self._col)
+
+        # update cursor
+        self._col += 1
+        if self._col >= self.max_columns:
+            self._row += 1
+            self._col = 0
+
+        return item
+
+    def add(self, item: Q) -> Q:
+        self._place(item)
+        self._items.append(item)
+        return item
+
+    def reflow(self) -> None:
+        self._row, self._col = 0, 0
+
+        for item in self._items:
+            super().removeWidget(item)
+            self._place(item)
+
+    def remove(self, item: QWidget) -> None:
+        super().removeWidget(item)
+        self._items.remove(item)
+        self.reflow()

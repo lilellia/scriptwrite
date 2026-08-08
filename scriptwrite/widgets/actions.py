@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QToolButton, QWidget
 
 from scriptwrite.types import F
 from scriptwrite.widgets.descriptors import QtEnum, QtProperty
+from scriptwrite.widgets.display import Color
 from scriptwrite.widgets.signals import QtSignalProperty
 
 V = TypeVar("V", bound=float | int | bool | QLine | QLineF | QPoint | QPointF | QRect | QRectF | QSize | QSizeF | QTime)
@@ -175,6 +176,14 @@ class ToolButton(QToolButton):
         self.auto_raise = True
         self.checkable = action.checkable
         self.button_style = "text"
+
+
+class ColorButton(ToolButton):
+    def __init__(self, color: Color, action: Action, parent: QWidget | None = None) -> None:
+        super().__init__(action, parent)
+        self.color = color
+
+        super().setStyleSheet(f""" QToolButton {{ background: {color.as_hex()}; }} """)
 
 
 class AnimatedAction(QVariantAnimation, Generic[V]):
