@@ -206,8 +206,8 @@ class Color:
         }
 
         dim_modifiers = {
-            "custom.dim-1": 0.30,
-            "custom.dim-2": 0.50,
+            "custom.dim-1": 0.45,
+            "custom.dim-2": 0.60,
             "custom.dim-3": 0.75,
         }
 
