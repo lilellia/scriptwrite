@@ -1,10 +1,19 @@
 from functools import cache
 import tomllib
-from typing import Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
+from typing import cast, Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
 
 from PySide6.QtCore import QObject, QRectF
-from PySide6.QtGui import QColor, QPaintDevice, QPainter, QPalette, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontInfo,
+    QPaintDevice,
+    QPainter,
+    QPalette,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+)
 from PySide6.QtWidgets import QApplication, QWidget
 
 from scriptwrite.fs import get_theme_file
@@ -34,6 +43,10 @@ ColorRole: TypeAlias = Literal[
     "mid",
     "midlight",
     "shadow",
+]
+
+FontType: TypeAlias = Literal[
+    "sans-serif", "serif", "typewriter", "decorative", "system", "any", "cursive", "monospace", "fantasy"
 ]
 
 
@@ -344,3 +357,44 @@ def load_theme(theme: str) -> QPalette:
 
     logger.info("loaded theme", theme=theme, palette=palette)
     return palette
+
+
+class Font(QFont):
+    @property
+    def size(self) -> int:
+        return super().pointSize()
+
+    @size.setter
+    def size(self, value: int, /) -> None:
+        super().setPointSize(value)
+
+    @property
+    def name(self) -> str:
+        return QFontInfo(self).family()
+
+    @classmethod
+    def load(cls, name: str | None, size: int, fallback: FontType = "system") -> Self:
+        lookup = {
+            "sans-serif": QFont.StyleHint.SansSerif,
+            "serif": QFont.StyleHint.Serif,
+            "typewriter": QFont.StyleHint.TypeWriter,
+            "decorative": QFont.StyleHint.Decorative,
+            "system": QFont.StyleHint.System,
+            "any": QFont.StyleHint.AnyStyle,
+            "cursive": QFont.StyleHint.Cursive,
+            "monospace": QFont.StyleHint.Monospace,
+            "fantasy": QFont.StyleHint.Fantasy,
+        }
+
+        if name and name.startswith("[") and name.endswith("]"):
+            if (candidate := name.removeprefix("[").removesuffix("]")) in lookup:
+                fallback = cast(FontType, candidate)
+                name = None
+            else:
+                logger.error(f"Could not parse font fallback {name!r}")
+                name = None
+
+        f = cls() if name is None else cls(name)
+        f.setStyleHint(lookup[fallback])
+        f.setPointSize(size)
+        return f

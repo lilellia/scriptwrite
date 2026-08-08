@@ -8,14 +8,14 @@ import sys
 from typing import Any, assert_never, ClassVar, IO, Literal, Self
 
 from PySide6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, Qt
-from PySide6.QtGui import QPalette, QStyleHints
+from PySide6.QtGui import QFont, QPalette, QStyleHints
 from PySide6.QtWidgets import QApplication, QStyle, QStyleFactory
 
 from scriptwrite.config import Config
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
 from scriptwrite.types import F
-from scriptwrite.widgets.display import load_theme
+from scriptwrite.widgets.display import Font, load_theme
 from scriptwrite.widgets.signals import QtSignalProperty
 
 
@@ -39,13 +39,12 @@ class Application(QApplication):
             self._extend_qt6_plugin_paths()
 
         super().__init__(*args, **kwargs)
-        self.style_theme = "Fusion"
 
-        if self.config.theme == "none":
-            self._theme = "none"
-            self._palette = QPalette()
-        else:
-            self.theme = self.config.theme
+        self.style_theme = "Fusion"
+        self.theme = self.config.theme
+
+        self.ui_font = Font.load(self.config.ui.font_family, self.config.ui.font_size, fallback="sans-serif")
+        logger.info("Loaded UI font", requested=self.config.ui.font_family, loaded=self.ui_font.name)
 
         type(self).__singleton__ = self
 
@@ -80,6 +79,15 @@ class Application(QApplication):
 
         super().setPalette(self._palette)
         self._theme = value
+
+    @property
+    def ui_font(self) -> QFont:
+        return self._ui_font
+
+    @ui_font.setter
+    def ui_font(self, value: QFont, /) -> None:
+        super().setFont(value)
+        self._ui_font = value
 
     @property
     def theme_palette(self) -> QPalette:

@@ -13,7 +13,7 @@ from scriptwrite.log import logger
 from scriptwrite.utils import discard, find_text, make_needle
 from scriptwrite.widgets.actions import Shortcut
 from scriptwrite.widgets.color_utils import get_color_name
-from scriptwrite.widgets.display import set_font_size
+from scriptwrite.widgets.display import Font, set_font_size
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -70,12 +70,8 @@ class LiveEditor(QMainWindow):
         self._other_shortcuts = self._init_shortcuts()
         self._status_bar = self._init_status_bar()
 
-        # font sizes
-        self._font_sizes: dict[Literal["default", "current"], int] = {
-            "default": config.font_size,
-            "current": config.font_size,
-        }
-        self._change_font_size()
+        self._current_font_size = self.configure_fonts()
+
         self._dirty: bool = False
 
         self._filepath: Path | None = None
@@ -108,6 +104,13 @@ class LiveEditor(QMainWindow):
         self._dirty = bool(val)
         symbol = "*" if self._dirty else "-"
         self.title = f"scriptwrite {symbol} {self._filepath or 'untitled'}"
+
+    def configure_fonts(self) -> int:
+        f = Font.load(config.editor.font_family, config.editor.font_size, fallback="serif")
+        logger.info("Loaded editor font", requested=config.editor.font_family, loaded=f.name)
+        self._editor.font_ = f
+        self._preview.font_ = f
+        return config.editor.font_size
 
     def add_pane(self, widget: W) -> W:
         """Add the given widget as an application pane."""
@@ -450,15 +453,13 @@ class LiveEditor(QMainWindow):
 
     def _change_font_size(self, direction: Literal[-1, 0, 1] = 0) -> None:
         if direction == 0:
-            self._font_sizes["current"] = self._font_sizes["default"]
+            self._current_font_size = config.editor.font_size
         else:
-            self._font_sizes["current"] += direction
+            self._current_font_size += direction
 
-        f = self._font_sizes["current"]
-
-        with logger.stopwatch(f"updating font size to {f}"):
-            set_font_size(self._editor, f)
-            set_font_size(self._preview, f)
+        with logger.stopwatch(f"updating font size to {self._current_font_size}"):
+            set_font_size(self._editor, self._current_font_size)
+            set_font_size(self._preview, self._current_font_size)
             self._preview.update_block_formatting()
 
     def run(self) -> None:

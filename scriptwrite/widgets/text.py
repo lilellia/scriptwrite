@@ -30,7 +30,7 @@ from scriptwrite.types import F
 from scriptwrite.widgets.actions import AnimatedAction
 from scriptwrite.widgets.cursor import Cursor
 from scriptwrite.widgets.descriptors import QtProperty
-from scriptwrite.widgets.display import Color, fill_rect, TextStyle
+from scriptwrite.widgets.display import Color, fill_rect, Font, TextStyle
 from scriptwrite.widgets.signals import QtSignalProperty
 
 
@@ -185,6 +185,14 @@ class TextArea(QTextEdit):
             yield
         finally:
             super().textCursor().endEditBlock()
+
+    @property
+    def font_(self) -> Font:
+        return Font(super().font())
+
+    @font_.setter
+    def font_(self, value: Font, /) -> None:
+        super().setFont(value)
 
     @property
     def font_size(self) -> int | None:
