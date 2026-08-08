@@ -1,0 +1,16 @@
+[All]
+Window = "#202326"
+WindowText = "#FCFCFC"
+Base = "#141618"
+AlternateBase = "#1D1F22"
+ToolTipBase = "#292C30"
+ToolTipText = "#FCFCFC"
+PlaceholderText = "#A1A9B1"
+Text = "#FCFCFC"
+Button = "#292C30"
+ButtonText = "#FCFCFC"
+# BrightText = ""
+Highlight = "#FCFCFC"
+HighlightedText = "#FCFCFC"
+# Accent = ""
+

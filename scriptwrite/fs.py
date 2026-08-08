@@ -194,3 +194,13 @@ class AppDirs:
 
 
 APP_DIRS = AppDirs.get()
+
+
+def get_theme_file(theme: str) -> Path:
+    if (p := APP_DIRS.config / "themes" / f"{theme}.toml").exists():
+        return p
+
+    if (p := Path(__file__).parent / "themes" / f"{theme}.toml").exists():
+        return p
+
+    raise ValueError(f"Unknown theme: {theme}")

@@ -1,10 +1,13 @@
 from typing import Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
+import tomllib
 
 from PySide6.QtCore import QObject, QRectF
 from PySide6.QtGui import QColor, QPaintDevice, QPainter, QPalette, QSyntaxHighlighter, QTextCharFormat
 from PySide6.QtWidgets import QApplication, QWidget
 
+from scriptwrite.fs import get_theme_file
+from scriptwrite.log import logger
 from scriptwrite.types import QtValueType
 from scriptwrite.widgets.descriptors import QtProperty
 
@@ -302,3 +305,21 @@ def set_font_size(widget: QWidget, size: int) -> None:
     font = widget.font()
     font.setPointSize(size)
     widget.setFont(font)
+
+
+def load_theme(theme: str) -> QPalette:
+    with get_theme_file(theme).open("rb") as f:
+        data = tomllib.load(f)
+
+    palette = QPalette()
+
+    for key, value in data.get("All", {}).items():
+        # these are applied universally and so do not take a color group
+        palette.setColor(QPalette.ColorRole[key], QColor(value))
+
+    for group in ("Active", "Inactive", "Disabled"):
+        for key, value in data.get(group, {}).items():
+            palette.setColor(QPalette.ColorGroup[group], QPalette.ColorRole[key], QColor(value))
+
+    logger.info("loaded theme", theme=theme, palette=palette)
+    return palette

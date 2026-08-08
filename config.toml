@@ -1,13 +1,6 @@
-# light | dark | system  (default=system)
-mode = "system"
+# breeze-light | breeze-dark | dracula | catpuccin-latte | catpuccin-mocha | ayu-dark (default = "none")
+# Use theme = "none" to query the system.
+theme = "none"
 
 # font size (pt) used for the editor and preview windows (default=12)
 font_size = 12
-
-# Whether the application should pull GTK styling (default=false)
-# This value is ignored on non-Linux systems.
-# If `true`, desktop environments which use GTK (GNOME, Cinnamon, etc.) will be allowed to inject GTK styles.
-# Note that this does not mean that non-GTK DEs (KDE, LXQt, etc.) will use GTK styling.
-#
-# (Specifically, setting this field to true mocks the environment as "KDE".)
-use_gtk_style = false

@@ -1,0 +1,23 @@
+# Taken from https://draculatheme.com/qt5
+
+[All]
+WindowText = "#BD93F9"
+Button = "#424559"
+Light = "#484D6B"
+Mid = "#6272A4"
+Dark = "#44475A"
+Text = "#6272A4"
+BrightText = "#44475A"
+ButtonText = "#BD93F9"
+Base = "#282A36"
+Window = "#282A36"
+Shadow = "#44475A"
+Highlight = "#6272A4"
+HighlightedText = "#BD93F9"
+Link = "#8BE9FD"
+LinkVisited = "#8BE9FD"
+AlternateBase = "#44475A"
+NoRole = "#6272A4"
+ToolTipBase = "#44475A"
+ToolTipText = "#F8F8F2"
+PlaceholderText = "#44475A"

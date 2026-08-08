@@ -1,0 +1,17 @@
+# Taken from https://catppuccin.com/palette/
+
+[All]
+Window          = "#EFF1F5"     # Base
+WindowText      = "#4C4F69"     # Text
+Base            = "#EFF1F5"     # Base
+AlternateBase   = "#E6E9EF"     # Mantle
+ToolTipBase     = "#DCE0E8"     # Crust
+ToolTipText     = "#4C4F69"     # Text
+PlaceholderText = "#8C8FA1"     # Overlay 1
+Text            = "#4C4F69"     # Text
+Button          = "#DCE0E8"     # Crust
+ButtonText      = "#4C4F69"     # Text
+# BrightText      = ""
+Highlight       = "#209FB5"     # Sapphire
+HighlightedText = "#EFF1F5"     # Base
+Accent          = "#8839EF"     # Mauve

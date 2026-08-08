@@ -16,6 +16,7 @@ from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
 from scriptwrite.types import F
 from scriptwrite.widgets.signals import QtSignalProperty
+from scriptwrite.widgets.display import load_theme
 
 
 class Application(QApplication):
@@ -37,12 +38,14 @@ class Application(QApplication):
             self._force_ime()
             self._extend_qt6_plugin_paths()
 
-            if not self.config.use_gtk_style:
-                self._force_non_gtk_style()
-
         super().__init__(*args, **kwargs)
-        self.theme = "Fusion"
-        self.mode = self.config.mode
+        self.style_theme = "Fusion"
+
+        if self.config.theme == "none":
+            self._theme = "none"
+            self._palette = QPalette()
+        else:
+            self.theme = self.config.theme
 
         type(self).__singleton__ = self
 
@@ -55,12 +58,31 @@ class Application(QApplication):
         return super().styleHints()
 
     @property
-    def theme(self) -> QStyle:
+    def style_theme(self) -> QStyle:
         return super().style()
 
-    @theme.setter
-    def theme(self, value: str | QStyle, /) -> None:
+    @style_theme.setter
+    def style_theme(self, value: str | QStyle, /) -> None:
         super().setStyle(value)
+
+    @property
+    def theme(self) -> str:
+        return self._theme
+
+    @theme.setter
+    def theme(self, value: str, /) -> None:
+        try:
+            self._palette = load_theme(value)
+        except ValueError:
+            value = "breeze-dark"
+            self._palette = load_theme("breeze-dark")
+
+        super().setPalette(self._palette)
+        self._theme = value
+
+    @property
+    def theme_palette(self) -> QPalette:
+        return self._palette
 
     @property
     def mode(self) -> Literal["light", "dark", "system"]:

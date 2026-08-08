@@ -9,15 +9,15 @@ from scriptwrite.log import logger
 
 class ConfigDict(TypedDict):
     mode: Literal["light", "dark", "system"]
+    theme: str
     font_size: int
     use_gtk_style: bool
 
 
 @dataclass(slots=True)
 class Config:
-    mode: Literal["light", "dark", "system"] = "system"
+    theme: str = "breeze-dark"
     font_size: int = 12
-    use_gtk_style: bool = False
 
     def write(self) -> None:
         path = APP_DIRS.config / "config.toml"
@@ -25,15 +25,12 @@ class Config:
         config = textwrap.dedent(f"""\
         # Changes only take effect when scriptwrite is loaded
 
-        # light | dark | system  (default=system)
-        mode = "{self.mode}"
+        # breeze-light | breeze-dark | dracula | catpuccin-latte | catpuccin-mocha | ayu-dark (default = "breeze-dark")
+        # Use theme = "none" to query the system.
+        theme = "{self.theme}"
 
         # font size (pt) used for the editor and preview windows (default=12)
         font_size = {self.font_size}
-
-        # Whether the application should pull GTK styling (default=false)
-        # This value is ignored on non-Linux systems.
-        use_gtk_style = {str(self.use_gtk_style).lower()}
         """)
 
         with open(path, "w", encoding="utf-8") as f:
