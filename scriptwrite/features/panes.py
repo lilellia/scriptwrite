@@ -1,7 +1,7 @@
 import ast
 from enum import IntEnum
 import sys
-from typing import Any, assert_never, cast, TypedDict
+from typing import Any, cast, TypedDict
 
 from PySide6.QtWidgets import QToolTip
 
@@ -9,15 +9,15 @@ from scriptwrite import renderers
 from scriptwrite.log import logger
 from scriptwrite.parser import Character, LineType, Script
 from scriptwrite.widgets import color_utils, qre
-from scriptwrite.widgets.display import Font, query_color, SyntaxHighlighter, TextStyle
-from scriptwrite.widgets.text import BlockFormat, TextArea, UserData
+from scriptwrite.widgets.display import query_color, SyntaxHighlighter, TextStyle
+from scriptwrite.widgets.text import TextArea, UserData
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QFontMetricsF, QTextBlock
+from PySide6.QtGui import QTextBlock
 
 
 class EditorPane(TextArea):
