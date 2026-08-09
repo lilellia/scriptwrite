@@ -9,7 +9,7 @@ from scriptwrite import renderers
 from scriptwrite.log import logger
 from scriptwrite.parser import Character, LineType, Script
 from scriptwrite.widgets import color_utils, qre
-from scriptwrite.widgets.display import Color, SyntaxHighlighter, TextStyle
+from scriptwrite.widgets.display import Font, query_color, SyntaxHighlighter, TextStyle
 from scriptwrite.widgets.text import BlockFormat, TextArea, UserData
 
 if sys.version_info >= (3, 12):
@@ -48,7 +48,7 @@ class _BlockState(IntEnum):
 
 class Highlighter(SyntaxHighlighter):
     def highlight_toml_header(self, text: str) -> None:
-        style = TextStyle(fg=Color.query("custom.dim-3"))
+        style = TextStyle(fg=query_color("custom.dim-3"))
 
         if self.previous_block_state == _BlockState.UNINITIALIZED:
             # first line of the file
@@ -78,7 +78,7 @@ class Highlighter(SyntaxHighlighter):
                 self.apply(style, *match.span(1))
 
     def highlight_html_comment(self, text: str) -> None:
-        style = TextStyle(fg=Color.query("custom.dim-2"))
+        style = TextStyle(fg=query_color("custom.dim-2"))
 
         if (state := self.previous_block_state) == _BlockState.UNINITIALIZED:
             state = 0
@@ -130,66 +130,23 @@ class PreviewPane(TextArea):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         super().setReadOnly(True)
-        self.css = renderers.html.DEFAULT_CSS
         self._source_line_map: dict[int, QTextBlock] = {}
 
     def write(self, script: Script) -> None:
         with logger.stopwatch(f"Writing blocks (word count = {script.total_words})"):
-            with self.transaction():
+            with (
+                self.transaction(),
+                self.suppress_updates(),
+                type(self).suppress_edits(self.doc),
+                self.suppress_signals(),
+            ):
                 self.doc.clear()
-                renderers.block.render_blocks(script, self.doc)
-            self.update_source_line_map()
-            self.update_block_formatting()
-
-    def update_source_line_map(self) -> None:
-        self._source_line_map.clear()
-        for block in self.blocks():
-            data = self.get_block_data(block)
-
-            if (source := data.get("source_line")) is not None:
-                self._source_line_map[source] = block
-
-    def update_block_formatting(self) -> None:
-        base_font_size = super().font().pointSizeF()
-        ch = QFontMetricsF(super().font()).horizontalAdvance("0")
-
-        with self.suppress_signals(), self.suppress_updates(), self.transaction():
-            for block in self.blocks():
-                data = self.get_block_data(block)
-                fmt = BlockFormat(block)
-
-                match data.get("type"):
-                    case None:
-                        match fmt.heading:
-                            case 1:
-                                fmt.font_size = base_font_size * 2
-                            case 2:
-                                fmt.font_size = base_font_size * 1.5
-
-                    case LineType.LISTENER:
-                        fmt.margin_left = 12 * ch
-                        fmt.margin_right = 12 * ch
-
-                    case LineType.CUE:
-                        fmt.margin_left = 6 * ch
-                        fmt.margin_right = 6 * ch
-
-                    case LineType.COMMENT:
-                        fmt.margin_left = 20 * ch
-                        fmt.margin_right = 20 * ch
-                        fmt.font_size = base_font_size * 0.8
-
-                    case LineType.SPOKEN:
-                        fmt.margin_left = 0
-                        fmt.margin_right = 0
-
-                    case _t:
-                        assert_never(_t)
+                self._source_line_map = renderers.block.render_blocks(script, into=self.doc, font=self.font_)
 
     @staticmethod
     def get_block_data(block: QTextBlock) -> LineData:
         if (data := block.userData()) and isinstance(data, UserData):
-            return LineData(**data.kwargs)
+            return cast(LineData, data.kwargs)
 
         return LineData()
 

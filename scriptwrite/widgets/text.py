@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 import sys
 from typing import Any, cast, Literal, Self
@@ -30,7 +30,7 @@ from scriptwrite.types import F
 from scriptwrite.widgets.actions import AnimatedAction
 from scriptwrite.widgets.cursor import Cursor
 from scriptwrite.widgets.descriptors import QtProperty
-from scriptwrite.widgets.display import Color, fill_rect, Font, TextStyle
+from scriptwrite.widgets.display import fill_rect, Font, query_color, TextStyle
 from scriptwrite.widgets.signals import QtSignalProperty
 
 
@@ -89,10 +89,10 @@ class TextArea(QTextEdit):
         self._cursor = Cursor(parent=self)
 
         # improve selection highlight colour contrast
-        super().setStyleSheet(f""" QTextEdit {{ selection-background-color: {Color.query("highlight").as_hex()}; }} """)
+        super().setStyleSheet(f""" QTextEdit {{ selection-background-color: {query_color("highlight").as_hex()}; }} """)
 
         # implement block highlighting
-        self._highlight_color = Color.query("accent")
+        self._highlight_color = query_color("accent")
         self._highlighted_block: QTextBlock | None = None
         self._highlight_animation: AnimatedAction[int] | None = None
 
@@ -261,29 +261,44 @@ class BlockFormat:
 
         self.cursor = QTextCursor(block)
 
-        if alignment is not None:
-            self.align = alignment
+        self.__cached_format__: QTextBlockFormat | None = None
+        self.__should_push__: bool = True
 
-        if heading is not None:
-            self.heading = heading
+        with self.bulk_update():
+            if alignment is not None:
+                self.align = alignment
 
-        if indent_level is not None:
-            self.indent_level = indent_level
+            if heading is not None:
+                self.heading = heading
 
-        if margin_left is not None:
-            self.margin_left = margin_left
+            if indent_level is not None:
+                self.indent_level = indent_level
 
-        if margin_right is not None:
-            self.margin_right = margin_right
+            if margin_left is not None:
+                self.margin_left = margin_left
 
-        if margin_bottom is not None:
-            self.margin_bottom = margin_bottom
+            if margin_right is not None:
+                self.margin_right = margin_right
 
-        if margin_top is not None:
-            self.margin_top = margin_top
+            if margin_bottom is not None:
+                self.margin_bottom = margin_bottom
+
+            if margin_top is not None:
+                self.margin_top = margin_top
 
         if font_size is not None:
             self.font_size = font_size
+
+    @contextmanager
+    def bulk_update(self) -> Generator[None]:
+        self.__cached_format__ = self._pull()
+        self.__should_push__ = False
+        try:
+            yield
+        finally:
+            self._push(self.__cached_format__)
+            self.__cached_format__ = None
+            self.__should_push__ = True
 
     def _pull(self) -> QTextBlockFormat:
         if not self.cursor.block().isValid():
@@ -292,6 +307,10 @@ class BlockFormat:
         return self.cursor.blockFormat()
 
     def _set(self, key: str, value: Any) -> None:
+        if self.__cached_format__:
+            getattr(self.__cached_format__, f"set{key}")(value)
+            return
+
         with TextArea.suppress_edits(self.cursor.block().document()):
             f = self._pull()
             getattr(f, f"set{key}")(value)
@@ -415,6 +434,7 @@ class TextBlock:
     def __init__(self, cursor: QTextCursor, **metadata: Any) -> None:
         self.cursor = cursor
         self.metadata = metadata
+        self.__block__: QTextBlock | None = None
 
     @property
     def format(self) -> BlockFormat:
@@ -438,10 +458,10 @@ class TextBlock:
         if exc_type is not None:
             return
 
-        block = self.cursor.block()
+        self.__block__ = self.cursor.block()
 
         if self.metadata:
-            block.setUserData(UserData(**self.metadata))
+            self.__block__.setUserData(UserData(**self.metadata))
 
         self.cursor.insertBlock()
 

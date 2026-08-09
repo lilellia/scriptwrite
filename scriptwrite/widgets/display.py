@@ -1,4 +1,3 @@
-from functools import cache
 import tomllib
 from typing import cast, Literal, NamedTuple, Self, TypeAlias, TypedDict, Unpack
 from weakref import ref
@@ -8,6 +7,7 @@ from PySide6.QtGui import (
     QColor,
     QFont,
     QFontInfo,
+    QFontMetricsF,
     QPaintDevice,
     QPainter,
     QPalette,
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 from scriptwrite.fs import get_theme_file
 from scriptwrite.log import logger
 from scriptwrite.types import QtValueType
+from scriptwrite.utils import cache
 from scriptwrite.widgets.descriptors import QtProperty
 
 ColorRole: TypeAlias = Literal[
@@ -178,47 +179,47 @@ class Color:
 
         return cls.from_rgb(r, g, b)
 
-    @classmethod
-    @cache
-    def query(cls, role: ColorRole | Literal["custom.dim-1", "custom.dim-2", "custom.dim-3"]) -> Self:
-        lookup = {
-            "window": QPalette.ColorRole.Window,
-            "window-text": QPalette.ColorRole.WindowText,
-            "base": QPalette.ColorRole.Base,
-            "alternative-base": QPalette.ColorRole.AlternateBase,
-            "tooltip-base": QPalette.ColorRole.ToolTipBase,
-            "tooltip-text": QPalette.ColorRole.ToolTipText,
-            "placeholder-text": QPalette.ColorRole.PlaceholderText,
-            "text": QPalette.ColorRole.Text,
-            "button": QPalette.ColorRole.Button,
-            "button-text": QPalette.ColorRole.ButtonText,
-            "bright-text": QPalette.ColorRole.BrightText,
-            "accent": QPalette.ColorRole.Accent,
-            "dark": QPalette.ColorRole.Dark,
-            "highlight": QPalette.ColorRole.Highlight,
-            "highlighted-text": QPalette.ColorRole.HighlightedText,
-            "light": QPalette.ColorRole.Light,
-            "link": QPalette.ColorRole.Link,
-            "link-visited": QPalette.ColorRole.LinkVisited,
-            "mid": QPalette.ColorRole.Mid,
-            "midlight": QPalette.ColorRole.Midlight,
-            "shadow": QPalette.ColorRole.Shadow,
-        }
 
-        dim_modifiers = {
-            "custom.dim-1": 0.45,
-            "custom.dim-2": 0.60,
-            "custom.dim-3": 0.75,
-        }
+@cache
+def query_color(role: ColorRole | Literal["custom.dim-1", "custom.dim-2", "custom.dim-3"]) -> Color:
+    lookup = {
+        "window": QPalette.ColorRole.Window,
+        "window-text": QPalette.ColorRole.WindowText,
+        "base": QPalette.ColorRole.Base,
+        "alternative-base": QPalette.ColorRole.AlternateBase,
+        "tooltip-base": QPalette.ColorRole.ToolTipBase,
+        "tooltip-text": QPalette.ColorRole.ToolTipText,
+        "placeholder-text": QPalette.ColorRole.PlaceholderText,
+        "text": QPalette.ColorRole.Text,
+        "button": QPalette.ColorRole.Button,
+        "button-text": QPalette.ColorRole.ButtonText,
+        "bright-text": QPalette.ColorRole.BrightText,
+        "accent": QPalette.ColorRole.Accent,
+        "dark": QPalette.ColorRole.Dark,
+        "highlight": QPalette.ColorRole.Highlight,
+        "highlighted-text": QPalette.ColorRole.HighlightedText,
+        "light": QPalette.ColorRole.Light,
+        "link": QPalette.ColorRole.Link,
+        "link-visited": QPalette.ColorRole.LinkVisited,
+        "mid": QPalette.ColorRole.Mid,
+        "midlight": QPalette.ColorRole.Midlight,
+        "shadow": QPalette.ColorRole.Shadow,
+    }
 
-        palette = QApplication.palette()
+    dim_modifiers = {
+        "custom.dim-1": 0.45,
+        "custom.dim-2": 0.60,
+        "custom.dim-3": 0.75,
+    }
 
-        if role in lookup:
-            qcolor = palette.color(lookup[role])
-            return cls(qcolor)
-        else:
-            qcolor = palette.color(lookup["placeholder-text"])
-            return cls(qcolor).dimmed(dim_modifiers[role])
+    palette = QApplication.palette()
+
+    if role in lookup:
+        qcolor = palette.color(lookup[role])
+        return Color(qcolor)
+    else:
+        qcolor = palette.color(lookup["placeholder-text"])
+        return Color(qcolor).dimmed(dim_modifiers[role])
 
 
 class TextStyleParams(TypedDict, total=False):
@@ -367,6 +368,10 @@ class Font(QFont):
     @size.setter
     def size(self, value: int, /) -> None:
         super().setPointSize(value)
+
+    @property
+    def char_width(self) -> float:
+        return QFontMetricsF(self).horizontalAdvance("0")
 
     @property
     def name(self) -> str:

@@ -460,7 +460,7 @@ class LiveEditor(QMainWindow):
         with logger.stopwatch(f"updating font size to {self._current_font_size}"):
             set_font_size(self._editor, self._current_font_size)
             set_font_size(self._preview, self._current_font_size)
-            self._preview.update_block_formatting()
+            self._compile()
 
     def run(self) -> None:
         super().showMaximized()

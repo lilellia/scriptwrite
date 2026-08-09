@@ -1,7 +1,8 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields, replace
+import functools
 import re
-from typing import Any, ParamSpec, Protocol, TYPE_CHECKING, TypeVar
+from typing import Any, cast, ParamSpec, Protocol, TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -12,6 +13,10 @@ else:
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+
+def cache(f: Callable[P, R]) -> Callable[P, R]:
+    return cast(Callable[P, R], functools.cache(f))
 
 
 def load_dataclass(cls: type[C], data: Mapping[str, Any]) -> C:
