@@ -12,7 +12,10 @@ from scriptwrite.utils import load_dataclass
 from scriptwrite.widgets.color_utils import parse_color_input
 from scriptwrite.widgets.display import Color
 
-RUN_SPLIT_PATTERN = re.compile(r"\(.*?\)|\*.*?\*|==.*?==")
+# pattern 1: (?<!\\)\(.*?(?<!\\)\)      text in parentheses (which are not escaped)
+# pattern 2: \*.*?\*                    text between asterisks
+# pattern 3: ==.*?==                    text between doubled equal signs
+RUN_SPLIT_PATTERN = re.compile(r"(?<!\\)\(.*?(?<!\\)\)|\*.*?\*|==.*?==")
 
 
 class Document(NamedTuple):
@@ -134,17 +137,21 @@ def parse_header(text: str) -> dict[str, Any]:
         return cast(dict[str, Any], data)
 
 
+def unescape_parens(text: str) -> str:
+    return text.replace("\\(", "(").replace("\\)", ")")
+
+
 def identify_run(run_text: str) -> TextRun:
     if match := re.fullmatch(r"\((.*)\)", run_text):
-        return TextRun(TextRunType.DIRECTIVE, match.group(1))
+        return TextRun(TextRunType.DIRECTIVE, unescape_parens(match.group(1)))
 
     if match := re.fullmatch(r"\*(.*)\*", run_text):
-        return TextRun(TextRunType.EMPHASIS, match.group(1))
+        return TextRun(TextRunType.EMPHASIS, unescape_parens(match.group(1)))
 
     if match := re.fullmatch(r"==(.*)==", run_text):
-        return TextRun(TextRunType.HIGHLIGHT, match.group(1).lstrip("{").rstrip("}"))
+        return TextRun(TextRunType.HIGHLIGHT, unescape_parens(match.group(1).lstrip("{").rstrip("}")))
 
-    return TextRun(TextRunType.NORMAL, run_text)
+    return TextRun(TextRunType.NORMAL, unescape_parens(run_text))
 
 
 def parse_cue_line(index: int, line: str) -> Line:

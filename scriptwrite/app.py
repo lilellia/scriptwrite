@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from contextlib import suppress
 from functools import partial
+import os
 from pathlib import Path
 import re
 import sys
@@ -20,7 +21,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QCloseEvent, QTextBlock
+from PySide6.QtGui import QCloseEvent, QTextBlock, QIcon
 from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
@@ -49,6 +50,7 @@ class LiveEditor(QMainWindow):
     def __init__(self, path: Path | None = None, *, title: str = "scriptwrite") -> None:
         super().__init__()
         self.title = title
+        self.icon = Path(__file__).parent / "assets" / "icon.png"
 
         self._split = QSplitter()
         super().setCentralWidget(self._split)
@@ -94,6 +96,17 @@ class LiveEditor(QMainWindow):
     @title.setter
     def title(self, value: str, /) -> None:
         super().setWindowTitle(str(value))
+
+    @property
+    def icon(self) -> QIcon:
+        return super().windowIcon()
+
+    @icon.setter
+    def icon(self, value: QIcon | str | os.PathLike[str], /) -> None:
+        if not isinstance(value, QIcon):
+            value = QIcon(str(value))
+
+        super().setWindowIcon(value)
 
     @property
     def dirty(self) -> bool:
