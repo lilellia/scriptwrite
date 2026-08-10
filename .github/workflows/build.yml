@@ -13,7 +13,7 @@ jobs:
                   python-version: "3.11"
 
             - name: Install dependencies
-              run: pip install pyside6 niji ruamel-yaml typing-extensions nuitka
+              run: pip install pyside6 typing-extensions nuitka
 
             - name: Build with Nuitka
               run: |

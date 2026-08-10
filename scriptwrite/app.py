@@ -21,7 +21,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from PySide6.QtGui import QCloseEvent, QTextBlock, QIcon
+from PySide6.QtGui import QCloseEvent, QIcon, QTextBlock
 from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
@@ -211,10 +211,11 @@ class LiveEditor(QMainWindow):
         if not self._maybe_save():
             return
 
-        self._filepath = None
-        self._editor.content = ""
-        self._insert_header()
-        self.dirty = False
+        with self._editor.suppress_signals():
+            self._filepath = None
+            self._editor.content = ""
+            self._insert_header()
+            self.dirty = False
 
     def _open_file(self, path: Path) -> None:
         """Open the given file, dumping its contents into the editor pane."""
@@ -222,7 +223,7 @@ class LiveEditor(QMainWindow):
 
         with self._editor.suppress_signals():
             try:
-                self._editor.content = path.read_text()
+                self._editor.content = path.read_text(encoding="utf-8")
                 logger.debug("Successfully read file", path=path)
             except OSError as err:
                 logger.error("Failed to read file", path=path, err=err)
