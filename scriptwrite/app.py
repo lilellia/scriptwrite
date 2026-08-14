@@ -434,12 +434,12 @@ class LiveEditor(QMainWindow):
         [characters.Alice]  # defines a character named Alice
         aliases = ["A"]     # allows "A: some text" to register as Alice's dialogue
         colour = "#ff6ae6"
-        summary: ...
+        summary = "..."
 
         [characters.Bob]
         aliases = ["B"]
         colour = "#139ad9"
-        summary: ...
+        summary = "..."
         +++
         """)
         self._editor.content = f"{header_template}\n{self._editor.content}"
