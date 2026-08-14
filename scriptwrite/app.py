@@ -77,6 +77,18 @@ class LiveEditor(QMainWindow):
         self._dirty: bool = False
 
         self._filepath: Path | None = None
+
+        if not path and config.reload_last_file:
+            # try to open the last file
+            if (store := fs.APP_DIRS.logs / ".last-touched").exists():
+                if (p := Path(store.read_text())).exists():
+                    logger.info("Reloading previous state", file=p)
+                    path = p
+                else:
+                    logger.warning("Previously open file was not found", file=p)
+            else:
+                logger.info("Cannot reload previous state because state file is not found", state_file=store)
+
         if path:
             self._open_file(path)
             logger.info("Loaded initial file", path=path)
@@ -151,7 +163,7 @@ class LiveEditor(QMainWindow):
                 MenuItemData("---", None),
                 MenuItemData("&Find/Replace", self._find_toolbar.toggle, shortcut=("Ctrl+F", "Ctrl+H")),
                 MenuItemData("---", None),
-                MenuItemData("&Edit Config", self._open_config_file, shortcut=("Ctrl+,")),
+                MenuItemData("&Edit Config", self._open_config_file, shortcut="Ctrl+,"),
             ],
             "&Tools": [
                 MenuItemData(
@@ -159,7 +171,7 @@ class LiveEditor(QMainWindow):
                     self._insert_header,
                     shortcut=("Ctrl+Shift+H"),
                 ),
-                MenuItemData("Insert &Color", self._color_selector.toggle, shortcut=("Ctrl+Shift+C")),
+                MenuItemData("Insert &Color", self._color_selector.toggle, shortcut="Ctrl+Shift+C"),
             ],
             "&Help": [
                 MenuItemData("&Help", self._show_help, shortcut="Ctrl+?"),
@@ -230,6 +242,7 @@ class LiveEditor(QMainWindow):
 
         self.dirty = False
         self._compile()
+        self._store_last_touched_file(path)
 
         self._status_bar.ephemeral(f"Loaded: {path}")
         with self._editor.suppress_signals():
@@ -295,6 +308,8 @@ class LiveEditor(QMainWindow):
             # remove autosave file
             with suppress(OSError):
                 self._get_autosave_dest().unlink()
+
+            self._store_last_touched_file(self._filepath)
 
         self.dirty = False
 
@@ -390,11 +405,16 @@ class LiveEditor(QMainWindow):
         self._editor.content = self._editor.content[:start] + repl + self._editor.content[end:]
         self._editor._cursor.select(start, start + len(repl))
 
+    @staticmethod
+    def _store_last_touched_file(file: Path) -> None:
+        with open(fs.APP_DIRS.logs / ".last-touched", "w") as f:
+            f.write(str(file.absolute()))
+
     def _open_config_file(self) -> None:
         path = fs.APP_DIRS.config / "config.toml"
 
         if not path.exists():
-            config.write
+            config.write()
 
         fs.open_file(path)
 
