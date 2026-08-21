@@ -108,6 +108,8 @@ class Config:
         if unknown := set.difference(found_keys, valid_keys):
             logger.warning(f"Found unknown keys in config file (will be ignored): {unknown}")
 
+        kwargs = {k: v for k, v in kwargs.items() if k in valid_keys}
+
         kwargs["ui"] = UIConfig(**kwargs.get("ui", {}))
         kwargs["editor"] = EditorConfig(**kwargs.get("editor", {}))
 

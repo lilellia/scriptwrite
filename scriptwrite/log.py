@@ -17,13 +17,15 @@ from threading import Thread
 import time
 from typing import Any, Protocol, TextIO
 
-from typing_extensions import override
-
 from scriptwrite.fs import APP_DIRS
 
 if sys.version_info >= (3, 12):
+    from typing import override
+
     DEFAULT_LOG_FORMAT = "{time:%Y-%m-%dT%H:%M:%S.%f%:z} | {level.name:<8} | {filename}:{line} | {message}"
 else:
+    from typing_extensions import override
+
     # %:z is 3.12+
     DEFAULT_LOG_FORMAT = "{time:%Y-%m-%dT%H:%M:%S.%f%z} | {level.name:<8} | {filename}:{line} | {message}"
 
