@@ -63,7 +63,7 @@ else
     echo 'local virtualenv Python executable not found'
     MADE_VENV=0
     for py in python3 python python3.11 python3.12 python3.13 python3.14; do
-        if /usr/bin/test "$(which "$py" ; echo "$?")" -eq 1; then
+        if /usr/bin/test "$(command -v "$py" ; echo "$?")" -eq 1; then
             continue
         fi
 
