@@ -1,10 +1,11 @@
 #!/bin/sh
 
 usage() {
-    echo "INSTALL_PREFIX=... $0" >&2
+    echo "INSTALL_PREFIX=... USE_LOCAL_QT=... $0" >&2
     # shellcheck disable=SC2016
     # ("Expressions don't expand in single quotes, use double quotes for that")
     echo 'INSTALL_PREFIX defines where the app will be installed. By default: INSTALL_PREFIX=$XDG_DATA_HOME if set and valid, else its usual value of $HOME/.local/share)' >&2
+    echo 'USE_LOCAL_QT defines whether we install PySide6 into our local venv (1) or build against the system version (0 or unset, default)' >&2
 }
 
 # Make sure usage is correct
@@ -37,6 +38,9 @@ else
     echo "Using $INSTALL_PREFIX as install location" >&2
 fi
 
+# Cleanly determine what USE_LOCAL_QT should be
+USE_LOCAL_QT="${USE_LOCAL_QT:-0}"
+
 # Make sure we have Python installed correctly
 
 is_sufficient_python() {
@@ -62,19 +66,35 @@ else
     # try to make a virtualenv
     echo 'local virtualenv Python executable not found'
     MADE_VENV=0
-    for py in python3 python python3.11 python3.12 python3.13 python3.14; do
-        if /usr/bin/test "$(command -v "$py" ; echo "$?")" -eq 1; then
-            continue
-        fi
 
-        if /usr/bin/test "$(is_sufficient_python "$py")" -eq 0; then
-            echo "found $py ($(command -v $py)): $($py --version)). Creating virtualenv" >&2
-            $py -m venv .venv
-            PYTHON='./.venv/bin/python3'
-            MADE_VENV=1
-            break
-        fi
-    done
+    if /usr/bin/test "$USE_LOCAL_QT" -eq 0; then
+      # use system PySide6, which means (1) we must use system Python and (2) system Python must have PySide6
+      if /usr/bin/test "$(/usr/bin/python3 -c 'import PySide6' ; echo "$?")" -eq 1; then
+        printf '%s\n%s\n' \
+          '/usr/bin/python3 cannot import PySide6.' \
+          'Install PySide6 into global Python (e.g. sudo pacman -S pyside6) or set USE_LOCAL_QT=1' \
+          >&2
+        exit 1
+      fi
+
+      /usr/bin/python3 -m venv --system-site-packages .venv
+      MADE_VENV=1
+    else
+      # we are using a local PySide6, so we can use basically whatever Python we want and then just install PySide6
+      for py in python3 python python3.11 python3.12 python3.13 python3.14; do
+          if /usr/bin/test "$(command -v "$py" >/dev/null ; echo "$?")" -eq 1; then
+              continue
+          fi
+
+          if /usr/bin/test "$(is_sufficient_python "$py")" -eq 0; then
+              echo "found $py ($(command -v $py)): $($py --version)). Creating virtualenv" >&2
+              $py -m venv .venv
+              PYTHON='./.venv/bin/python3'
+              MADE_VENV=1
+              break
+          fi
+      done
+    fi
 
     if /usr/bin/test "$MADE_VENV" -eq 0; then
         echo 'failed to make virtualenv' >&2
@@ -87,7 +107,11 @@ if /usr/bin/test "$($PYTHON -c 'import PySide6, nuitka' ; echo "$?")" -eq 1; the
     echo 'Python found to be missing dependencies. Installing...'
     $PYTHON -m ensurepip  # uv doesn't automatically include pip for some reason, but... pip is the standard, so that's what we're going to use
     $PYTHON -m pip install --upgrade pip
-    $PYTHON -m pip install nuitka pyside6
+    $PYTHON -m pip install nuitka
+
+    if /usr/bin/test "$USE_LOCAL_QT" -eq 1; then
+      $PYTHON -m pip install pyside6
+    fi
 
     if /usr/bin/test "$(is_python_311 "$PYTHON")" -eq 0; then
         # 3.11, specifically, also requires typing-extensions
