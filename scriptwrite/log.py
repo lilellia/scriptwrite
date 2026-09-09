@@ -15,7 +15,7 @@ from queue import Queue
 import sys
 from threading import Thread
 import time
-from typing import Any, Protocol, TextIO
+from typing import Any, Protocol, TextIO, TypeVar
 
 from scriptwrite.fs import APP_DIRS
 
@@ -156,6 +156,9 @@ class Handler(ABC):
         self._level = _parse_log_level(value)
 
 
+H = TypeVar("H", bound=Handler)
+
+
 class SinkHandler(Handler):
     def __init__(
         self,
@@ -241,8 +244,7 @@ class Logger:
         self, stream: TextIO, level: Level | str, format: str = DEFAULT_LOG_FORMAT, filter: FilterFunc | None = None
     ) -> SinkHandler:
         handler = SinkHandler(stream, level, format, filter)
-        self.handlers[self.get_open_id()] = handler
-        return handler
+        return self.add_handler(handler)
 
     def add_file(
         self,
@@ -252,6 +254,9 @@ class Logger:
         rotation: int | None = None,
     ) -> FileHandler:
         handler = FileHandler(path, level, filter, rotation)
+        return self.add_handler(handler)
+
+    def add_handler(self, handler: H) -> H:
         self.handlers[self.get_open_id()] = handler
         return handler
 

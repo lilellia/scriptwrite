@@ -192,6 +192,7 @@ class LiveEditor(QMainWindow):
 
     def _init_status_bar(self) -> StatusBar:
         bar = StatusBar(self)
+        bar.hook_logger()
         bar.add_label("word-counts")
         bar.add_label("cursor", "L1:C1")
         super().setStatusBar(bar)
