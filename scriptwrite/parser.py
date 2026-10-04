@@ -75,6 +75,10 @@ class Script:
     unspoken_words: int = 0
 
     @property
+    def content_tags(self) -> list[str]:
+        return self.tags[len(self.audience) :]
+
+    @property
     def word_count_display(self) -> str:
         by_char = " | ".join(f"{char.name}: {words:,}" for char, words in self.word_counts.items())
         return f"{by_char} (total = {self.total_spoken_words:,} = {self.total_words:,} x {self.speech_density:.4f})"

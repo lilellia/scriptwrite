@@ -1,6 +1,7 @@
 from io import StringIO
 from typing import Any, assert_never
 
+from scriptwrite.config import ExportConfig
 from scriptwrite.parser import Line, LineType, Script, TextRun, TextRunType
 from scriptwrite.widgets.display import Color
 
@@ -110,7 +111,7 @@ def make_comment_line(line: Line) -> Line:
     return Line(line.index, LineType.COMMENT, speaker=None, text_runs=[run])
 
 
-def render_html(script: Script, *, inject_css: bool = True) -> str:
+def render_html(script: Script, *, config: ExportConfig, inject_css: bool = True) -> str:
     buffer = StringIO()
 
     buffer.write(render_header(script, inject_css=inject_css))
@@ -128,7 +129,8 @@ def render_html(script: Script, *, inject_css: bool = True) -> str:
                 buffer.write(render_line(line, clsname="stagedir", prefix="[", suffix="]"))
 
             case LineType.COMMENT:
-                buffer.write(render_line(make_comment_line(line), clsname="comment"))
+                pass
+                # buffer.write(render_line(make_comment_line(line), clsname="comment"))
 
             case _:
                 assert_never(line.type)

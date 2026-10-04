@@ -11,6 +11,7 @@ from typing import cast, Literal
 
 from scriptwrite.features.toolbars import ColorSelector
 from scriptwrite.log import logger
+from scriptwrite.renderers.export import export
 from scriptwrite.utils import discard, find_text, make_needle
 from scriptwrite.widgets.actions import Shortcut
 from scriptwrite.widgets.color_utils import get_color_name
@@ -150,6 +151,7 @@ class LiveEditor(QMainWindow):
                 MenuItemData("&Open", self._get_open_file, shortcut="Ctrl+O"),
                 MenuItemData("&Save", self._save_file, shortcut="Ctrl+S"),
                 MenuItemData("Save As", self._save_as, shortcut="Ctrl+Shift+S"),
+                MenuItemData("Export", self._export, shortcut="Ctrl+Shift+E"),
                 MenuItemData("---", None),
                 MenuItemData("&Quit", self._quit, shortcut="Ctrl+Q"),
             ],
@@ -433,7 +435,7 @@ class LiveEditor(QMainWindow):
                 script = parser.parse_text(self._editor.content)
         except tomllib.TOMLDecodeError as err:
             # we have to add one to the line number to account for the +++ fence
-            self._status_bar.set(f"[L{err.lineno + 1}C{err.lineno}] {err.msg}")
+            self._status_bar.set(f"[L{err.lineno + 1}C{err.colno}] {err.msg}")
             self._editor.show_syntax_error(err.msg, err.lineno + 1, col=None)
             return
 
@@ -465,6 +467,16 @@ class LiveEditor(QMainWindow):
         """)
         self._editor.content = f"{header_template}\n{self._editor.content}"
 
+    def _export(self) -> None:
+        script = parser.parse_text(self._editor.content)
+        root = self._filepath.parent if self._filepath else None
+
+        filters = ["HTML (*.html)", "ODF Text Document (*.odt)"]
+
+        if path := fs.get_save_filepath(root, filters=filters):
+            export(script, path=path, config=config.export)
+            self._status_bar.ephemeral(f"Exported file to {path}")
+
     def _show_help(self) -> None:
         message = textwrap.dedent("""
             T: This is a line of dialogue spoken by the T character.
@@ -479,7 +491,7 @@ class LiveEditor(QMainWindow):
 
             ++Lead a line with two plus signs to mark it as a stage direction.
 
-            // Use two slashes to mark a comment. This shows in the preview, but won't be exported by default.
+            // Use two slashes to mark a comment.
         """)
         QMessageBox.information(None, "Help", message)
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field, fields
 import textwrap
 import tomllib
-from typing import Self, TypedDict
+from typing import Any, Literal, Self, TypedDict
 
 from scriptwrite.fs import APP_DIRS
 from scriptwrite.log import logger
@@ -17,11 +17,23 @@ class EditorConfigDict(TypedDict):
     font_family: str
 
 
+class ODFExportConfigDict(TypedDict):
+    paper_size: str
+    margins: str
+    font_size: int
+    font_path: str
+
+
+class ExportConfigDict(TypedDict):
+    odf: ODFExportConfigDict
+
+
 class ConfigDict(TypedDict):
     theme: str
     reload_last_file: bool
     ui: UIConfigDict
     editor: EditorConfigDict
+    export: ExportConfigDict
 
 
 @dataclass(slots=True)
@@ -43,11 +55,42 @@ class EditorConfig:
 
 
 @dataclass(slots=True)
+class ODFExportConfig:
+    paper_size: Literal["a4", "letter"] = "a4"
+    margins: str = "25mm"
+    font_size: int = 12
+    font_path: str = ""
+
+    def __post_init__(self):
+        if self.paper_size not in ("a4", "letter"):
+            logger.warning("Unknown paper size. Defaulting to a4", paper_size=self.paper_size)
+            self.paper_size = "a4"
+
+    def as_dict(self) -> ODFExportConfigDict:
+        return ODFExportConfigDict(
+            paper_size=self.paper_size, margins=self.margins, font_size=self.font_size, font_path=self.font_path
+        )
+
+
+@dataclass(slots=True)
+class ExportConfig:
+    odf: ODFExportConfig = field(default_factory=ODFExportConfig)
+
+    @classmethod
+    def from_dict(cls, **kwargs: Any) -> Self:
+        return cls(odf=ODFExportConfig(**kwargs.get("odf", {})))
+
+    def as_dict(self) -> ExportConfigDict:
+        return ExportConfigDict(odf=self.odf.as_dict())
+
+
+@dataclass(slots=True)
 class Config:
     theme: str = "breeze-dark"
     reload_last_file: bool = True
     ui: UIConfig = field(default_factory=UIConfig)
     editor: EditorConfig = field(default_factory=EditorConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
 
     def write(self) -> None:
         path = APP_DIRS.config / "config.toml"
@@ -84,6 +127,20 @@ class Config:
         # In addition to providing a concrete font name, the following classes can be used to query the system:
         # [sans-serif] | [serif] | [monospace] | [any] | [system] | [typewriter] | [decorative] | [cursive] | [fantasy]
         font_family = "{self.editor.font_family}"
+
+        [export.odf]
+        # the size of the paper to use for the document, either "a4" or "letter" (default = "a4")
+        paper_size = "{self.export.odf.paper_size}"
+
+        # The margins for the page, e.g., "25mm" or "1in". It must be a single value, used for all four sides.
+        # (default = "25mm")
+        margins = "{self.export.odf.margins}"
+
+        # font size (pt) used for the document (default=12)
+        font_size = {self.export.odf.font_size}
+
+        # The path on disk of the font to be used in the document.
+        font_path = "{self.export.odf.font_path}"
         """)
 
         with open(path, "w", encoding="utf-8") as f:
@@ -112,10 +169,15 @@ class Config:
 
         kwargs["ui"] = UIConfig(**kwargs.get("ui", {}))
         kwargs["editor"] = EditorConfig(**kwargs.get("editor", {}))
+        kwargs["export"] = ExportConfig.from_dict(**kwargs.get("export", {}))
 
         return cls(**kwargs)
 
     def as_dict(self) -> ConfigDict:
         return ConfigDict(
-            theme=self.theme, reload_last_file=self.reload_last_file, ui=self.ui.as_dict(), editor=self.editor.as_dict()
+            theme=self.theme,
+            reload_last_file=self.reload_last_file,
+            ui=self.ui.as_dict(),
+            editor=self.editor.as_dict(),
+            export=self.export.as_dict(),
         )

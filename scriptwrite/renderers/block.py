@@ -59,10 +59,22 @@ def render_header(script: Script, cursor: QTextCursor, font: Font) -> None:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12, heading=2, font_size=font.size * 1.5)
         block.write(script.author, TextStyle(bold=True))
 
+    # TAGS
+    with TextBlock(cursor) as block:
+        block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12)
+        block.write(" ".join(f"[{tag}]" for tag in script.tags), TextStyle(italic=True))
+
     # SUMMARY
     with TextBlock(cursor) as block:
         block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=12)
         block.write(script.summary, TextStyle(italic=True))
+
+    # CHARACTERS
+    for character in script.characters:
+        with TextBlock(cursor) as block:
+            block.format = BlockFormat(cursor.block(), margin_top=8, margin_bottom=4, margin_left=20, margin_right=20)
+            block.write(f"{character.name}: ", TextStyle(fg=character.colour, bold=True))
+            block.write(character.summary, TextStyle(fg=character.colour))
 
 
 @cache
