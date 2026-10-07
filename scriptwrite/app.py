@@ -471,7 +471,11 @@ class LiveEditor(QMainWindow):
         script = parser.parse_text(self._editor.content)
         root = self._filepath.parent if self._filepath else None
 
-        filters = ["HTML (*.html)", "ODF Text Document (*.odt)"]
+        filters = [
+            "Scriptbin Markdown File (*.md)",
+            "HTML File (*.html)",
+            "ODF Text Document (*.odt)",
+        ]
 
         if path := fs.get_save_filepath(root, filters=filters):
             export(script, path=path, config=config.export)
