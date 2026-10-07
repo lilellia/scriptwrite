@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 import re
 import tomllib
-from typing import Any, cast, NamedTuple
+from typing import Any, cast, NamedTuple, Self
 
 from scriptwrite.utils import load_dataclass
 from scriptwrite.widgets.color_utils import parse_color_input
@@ -51,6 +51,10 @@ class Character:
     aliases: tuple[str, ...] = field(default_factory=tuple, metadata=dict(converter=tuple))
     summary: str = ""
 
+    @classmethod
+    def default(cls) -> Self:
+        return cls(name="")
+
 
 @dataclass(slots=True, frozen=True)
 class Line:
@@ -70,6 +74,7 @@ class Script:
     tags: list[str] = field(default_factory=list)
     published: datetime | None = None
     characters: list[Character] = field(default_factory=list)
+    listener: Character = field(default_factory=Character.default)
     lines: list[Line] = field(default_factory=list)
     word_counts: dict[Character, int] = field(default_factory=dict)
     unspoken_words: int = 0
@@ -208,6 +213,10 @@ def parse_text(content: str) -> Script:
     published = header.get("published", None)
     series = header.get("series", None)
     characters = [load_dataclass(Character, {"name": name, **data}) for name, data in header["characters"].items()]
+    listener = Character(
+        name=header.get("listener", {}).get("name", ""),
+        summary=header.get("listener", {}).get("summary", ""),
+    )
     lines: list[Line] = []
     word_counts: dict[Character, int] = defaultdict(int)
     unspoken_words = 0
@@ -255,6 +264,7 @@ def parse_text(content: str) -> Script:
         series=series,
         published=published,
         characters=characters,
+        listener=listener,
         lines=lines,
         word_counts=word_counts,
         unspoken_words=unspoken_words,
