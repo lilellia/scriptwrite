@@ -475,6 +475,7 @@ class LiveEditor(QMainWindow):
             "Scriptbin Markdown File (*.md)",
             "HTML File (*.html)",
             "ODF Text Document (*.odt)",
+            "Fountain Document (*.fountain)",
         ]
 
         if path := fs.get_save_filepath(root, filters=filters):

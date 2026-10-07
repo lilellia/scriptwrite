@@ -2,6 +2,7 @@ from pathlib import Path
 
 from scriptwrite.config import ExportConfig
 from scriptwrite.parser import Script, parse_text
+from scriptwrite.renderers.fountain import render_fountain
 from scriptwrite.renderers.html import render_html
 
 # from scriptwrite.renderers.latex import render_latex
@@ -34,6 +35,12 @@ def export(script: Script, path: Path, config: ExportConfig) -> None:
         case ".odt":
             export_format = "odt"
             write_odt(script, path, config=config)
+
+        case ".fountain":
+            export_format = "fountain"
+            content = render_fountain(script, config=config)
+            path.write_text(content, encoding="utf-8")
+
         case _:
             raise ValueError(f"Invalid suffix {path.suffix}")
 
